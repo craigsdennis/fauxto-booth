@@ -7,7 +7,6 @@ export type BoothState = {
 
 export class BoothAgent extends Agent<Env, BoothState> {
 
-    @callable()
     setup({displayName}: {displayName: string}) {
         // Update the state, auto broadcasts
         this.setState({

@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { useAgent } from "agents/react";
-import type { MyAgent, PublicAgentState } from "../worker/agents/my-agent";
+import type { HubAgent, HubState, BoothDetail } from "../worker/agents/hub";
 
 function App() {
-  const [someReactValueState, setSomeReactValueState] = useState<string>("Initial value");
-  const agent = useAgent<MyAgent, PublicAgentState>({
-    agent: "my-agent",
+  const [latestBooths, setLatestBooths] = useState<BoothDetail[]>([]);
+  const agent = useAgent<HubAgent, HubState>({
+    agent: "hub-agent",
     onStateUpdate(state) {
-      setSomeReactValueState(state.someValue);
+      setLatestBooths(state.latestBooths);
     },
   });
 
-  async function update(formData: FormData) {
-    const someInputValue = (formData.get("some-input-value") as string) ?? "";
+  async function addBooth(formData: FormData) {
+    const someInputValue = (formData.get("name") as string) ?? "";
     await agent.stub.updateSomeValue({ someValue: someInputValue });
   }
 

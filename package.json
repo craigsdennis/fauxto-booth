@@ -25,6 +25,7 @@
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.16.1",
 		"@eslint/js": "^9.33.0",
+		"@types/node": "^24.10.1",
 		"@types/react": "^19.1.10",
 		"@types/react-dom": "^19.1.7",
 		"@vitejs/plugin-react": "^5.0.0",
