@@ -23,4 +23,12 @@ export class BoothAgent extends Agent<Env, BoothState> {
             description
         })
     }
+
+    async onRequest(_request: Request): Promise<Response> {
+        void _request;
+        // TODO: get userId
+        // TODO: process form upload, store in R2
+        console.log("Hi mom");
+        return new Response("Not implemented", { status: 501 });
+    }
 }

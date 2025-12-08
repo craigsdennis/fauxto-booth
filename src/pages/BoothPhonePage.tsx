@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { useAgent } from "agents/react";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
@@ -24,8 +24,21 @@ type BoothPhonePageProps = {
   navigate: Navigate;
 };
 
+type UploadStatus =
+  | { status: "idle" }
+  | { status: "pending" }
+  | { status: "success" }
+  | { status: "error"; message: string };
+
 export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
   const [boothState, setBoothState] = useState<BoothState | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ status: "idle" });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [supportsCamera, setSupportsCamera] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
@@ -37,18 +50,119 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
 
   const displayName = boothState?.displayName || slug;
   const description = boothState?.description || "Snap or upload a selfie. We'll make it look like you're on set.";
-  const backgroundStyle: CSSProperties = boothState?.backgroundImageUrl
-    ? {
-        backgroundImage: `url(${boothState.backgroundImageUrl})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : {
-        backgroundImage:
-          "linear-gradient(135deg, rgba(14,165,233,0.35), rgba(147,51,234,0.25)), radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1), transparent 60%), #020617",
-        backgroundSize: "cover",
-      };
   const hostPath = `/booths/${encodeURIComponent(slug)}`;
+  const uploadEndpoint = `/agents/booth-agent/${encodeURIComponent(slug)}`;
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    if (navigator.mediaDevices?.getUserMedia) {
+      setSupportsCamera(true);
+    }
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  async function uploadSelfie(file: Blob | File, filename?: string) {
+    if (!file) return;
+    const formData = new FormData();
+    const finalName = (file instanceof File && file.name) || filename || "selfie.jpg";
+    formData.append("selfie", file, finalName);
+    formData.append("slug", slug);
+    formData.append("source", "phone-ui");
+
+    try {
+      setUploadStatus({ status: "pending" });
+      const response = await fetch(uploadEndpoint, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed. Please try again.");
+      }
+
+      setUploadStatus({ status: "success" });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      setUploadStatus({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Something went wrong while uploading your selfie.",
+      });
+    }
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    void uploadSelfie(file);
+  }
+
+  function triggerFilePicker() {
+    fileInputRef.current?.click();
+  }
+
+  async function startCamera() {
+    if (!supportsCamera) {
+      triggerFilePicker();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      streamRef.current = stream;
+      setCameraActive(true);
+      setCameraError(null);
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        await video.play();
+      }
+    } catch (error) {
+      setCameraError(
+        error instanceof Error
+          ? error.message
+          : "We couldn't access your camera. Please allow permissions or upload from your files.",
+      );
+      triggerFilePicker();
+    }
+  }
+
+  function stopCamera() {
+    if (streamRef.current) {
+      for (const track of streamRef.current.getTracks()) {
+        track.stop();
+      }
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  }
+
+  async function capturePhoto() {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    const width = video.videoWidth || 1080;
+    const height = video.videoHeight || 1440;
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setUploadStatus({ status: "error", message: "We couldn't capture the frame. Try again." });
+      return;
+    }
+    context.drawImage(video, 0, 0, width, height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setUploadStatus({ status: "error", message: "Failed to save the photo. Try again." });
+        return;
+      }
+      void uploadSelfie(blob, `selfie-${Date.now()}.jpg`);
+    }, "image/jpeg", 0.92);
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -60,15 +174,77 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
         </header>
 
         <div className="mt-8 space-y-8">
-          <div className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-900/60">
-            <div className="relative aspect-[4/5]" style={backgroundStyle}>
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 to-transparent" />
-              <div className="absolute bottom-0 w-full p-5">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-300">Backdrop preview</p>
-                <p className="mt-2 text-lg font-semibold text-white">We'll match your lighting to this scene.</p>
+          <section className="rounded-[28px] border border-white/10 bg-slate-900/70 p-6">
+            <h2 className="text-base font-semibold">Take your selfie</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              Use your front camera, fill the guide with your face and shoulders, and submit once you're happy.
+            </p>
+
+            <div className="mt-5 flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-500 to-blue-600 px-4 py-3 text-base font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:from-cyan-300 hover:via-sky-400 hover:to-blue-500"
+                >
+                  {cameraActive ? "Camera ready" : supportsCamera ? "Open camera" : "Use camera (prompt)"}
+                </button>
+                {cameraActive && (
+                  <>
+                    <video ref={videoRef} playsInline className="h-64 w-full rounded-2xl border border-white/10 object-cover" />
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={capturePhoto}
+                        className="flex-1 rounded-2xl border border-emerald-400/60 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-200"
+                      >
+                        {uploadStatus.status === "pending" ? "Uploading…" : "Capture photo"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200"
+                      >
+                        Close camera
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
+
+              <button
+                type="button"
+                onClick={triggerFilePicker}
+                className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-white"
+              >
+                Upload from photos
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {cameraError && <p className="text-sm text-rose-300">{cameraError}</p>}
+
+              <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-sm text-slate-300">
+                <p className="font-semibold text-white">Status</p>
+                {uploadStatus.status === "idle" && <p className="mt-1">Ready for your close-up.</p>}
+                {uploadStatus.status === "pending" && <p className="mt-1">Uploading… this can take a few seconds.</p>}
+                {uploadStatus.status === "success" && (
+                  <p className="mt-1 text-emerald-300">Got it! We'll ping the host as soon as your composite is ready.</p>
+                )}
+                {uploadStatus.status === "error" && (
+                  <p className="mt-1 text-rose-300">{uploadStatus.message}</p>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">
+                Your photo uploads securely to {uploadEndpoint}. We only use it to generate the group picture.
+              </p>
             </div>
-          </div>
+          </section>
 
           <section className="rounded-[28px] border border-white/10 bg-slate-900/70 p-6">
             <h2 className="text-base font-semibold">Ready when you are</h2>
