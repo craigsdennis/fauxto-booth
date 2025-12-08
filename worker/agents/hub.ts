@@ -1,5 +1,4 @@
 import { Agent, callable, getAgentByName } from "agents";
-import type { BoothAgent } from "./booth";
 
 export type BoothDetail = {
   name: string;
@@ -72,11 +71,11 @@ export class HubAgent extends Agent<Env, HubState> {
   }
 
   @callable()
-  async createBooth({ displayName }: { displayName: string }) {
+  async createBooth({ displayName, description }: { displayName: string, description: string }) {
     const boothSlug = await this.generateUniqueBoothSlug(displayName);
     const booth = await getAgentByName(this.env.BoothAgent, boothSlug);
     // Save the booth
-    await booth.setup({displayName});
+    await booth.setup({displayName, description});
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this.sql`INSERT INTO booths (slug, displayName) VALUES (${boothSlug}, ${displayName});`;
     // Prepend the state

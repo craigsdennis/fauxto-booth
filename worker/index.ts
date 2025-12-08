@@ -15,7 +15,7 @@ const app = new Hono<{ Bindings: Env, Variables: Vars }>();
 app.use(async (c, next) => {
   // Ensure c.var.userId is set
   let userId = getCookie(c, "userId");
-  if (!userId) {
+  if (userId === undefined) {
     userId = crypto.randomUUID();
     console.log("User not found, generating new user: ", userId);
     setCookie(c, "userId", userId);
