@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { BoothAgent } from "./agents/booth";
 import { HubAgent } from "./agents/hub";
+import { Backgrounder } from "./workflows/backgrounder";
 import { agentsMiddleware } from "hono-agents";
 import { getCookie, setCookie } from "hono/cookie";
 
-export { BoothAgent, HubAgent };
+export { BoothAgent, HubAgent, Backgrounder };
 
 export type Vars = {
   userId: string;
@@ -22,6 +23,17 @@ app.use(async (c, next) => {
   }
   c.set("userId", userId);
   await next();
+});
+
+app.get("/api/images/*", async (c) => {
+  const prefix = "/api/images/";
+  const filename = c.req.path.replace(prefix, "");
+  const obj = await c.env.Photos.get(filename);
+  if (obj === null) {
+    return c.notFound();
+  }
+  console.log({customMetadata: obj.customMetadata});
+  return c.body(obj.body, 200);
 });
 
 app.get("/api", async (c) => {
