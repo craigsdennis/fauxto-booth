@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
+import * as QRCode from "qrcode";
 import { useAgent } from "agents/react";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
@@ -19,8 +19,11 @@ type BoothPageProps = {
 
 export function BoothPage({ slug, navigate }: BoothPageProps) {
   const [boothState, setBoothState] = useState<BoothState | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [qrCodeSrc, setQrCodeSrc] = useState<string | null>(null);
+  const [qrCodeError, setQrCodeError] = useState<string | null>(null);
 
-  useAgent<BoothAgent, BoothState>({
+  const agent = useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
     name: slug,
     onStateUpdate(state) {
@@ -28,29 +31,69 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
     },
   });
 
-  const backgroundReady = Boolean(boothState?.backgroundImageUrl);
+  const backgroundImageStatus = boothState?.backgroundImageStatus ?? "ready";
+  const backgroundReady = Boolean(boothState?.backgroundFilePath);
+  const isGeneratingBackground = backgroundImageStatus === "generating";
+  const canRefreshBackground = backgroundImageStatus === "ready";
   const displayName = boothState?.displayName || slug;
   const description = boothState?.description;
   const boothPath = `/booths/${encodeURIComponent(slug)}`;
   const phonePath = `${boothPath}/phone`;
   const phoneUrl = createAbsoluteUrl(phonePath);
+  const backgroundUrl = boothState?.backgroundFilePath
+    ? `/api/images/${boothState.backgroundFilePath}`
+    : null;
 
-  const qrSrc = useMemo(() => {
-    const encoded = encodeURIComponent(phoneUrl);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encoded}`;
+  useEffect(() => {
+    let active = true;
+    setQrCodeSrc(null);
+    setQrCodeError(null);
+
+    QRCode.toDataURL(phoneUrl, {
+      width: 240,
+      margin: 1,
+      color: {
+        dark: "#020617", // slate-950 copy
+        light: "#ffffff",
+      },
+    })
+      .then((dataUrl) => {
+        if (active) {
+          setQrCodeSrc(dataUrl);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setQrCodeError("We couldn't draw that QR. Copy the link instead.");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [phoneUrl]);
 
-  const backgroundStyle: CSSProperties = backgroundReady
-    ? {
-        backgroundImage: `url(${boothState?.backgroundImageUrl})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : {
-        backgroundImage:
-          "radial-gradient(circle at 15% 20%, rgba(34,211,238,0.35), transparent 55%), radial-gradient(circle at 80% 0%, rgba(233,131,255,0.25), transparent 60%), linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95))",
-        backgroundSize: "cover",
-      };
+  async function handleRefreshBackground() {
+    if (!agent?.stub?.refreshBackground) {
+      setGenerateError("Connecting to the booth—try again in a beat.");
+      return;
+    }
+
+    if (!canRefreshBackground) {
+      return;
+    }
+
+    try {
+      setGenerateError(null);
+      await agent.stub.refreshBackground();
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error
+          ? error.message
+          : "We couldn't start that render. Please try again.",
+      );
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -88,20 +131,51 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
 
           <div className="mt-12 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
             <div className="overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/40 shadow-2xl shadow-black/50">
-              <div className="relative aspect-[5/3] w-full" style={backgroundStyle}>
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-slate-950/70" />
-                <div className="absolute inset-0 flex flex-col justify-end p-8">
-                  <p className="text-sm font-medium uppercase tracking-[0.3em] text-slate-300">
-                    {backgroundReady ? "Backdrop locked in" : "Generating AI backdrop"}
-                  </p>
-                  <h2 className="mt-3 text-3xl font-semibold text-white">
-                    {backgroundReady ? "Guests will match this look" : "We're crafting your set"}
-                  </h2>
-                  <p className="mt-3 text-sm text-slate-300">
-                    {backgroundReady
-                      ? "Every upload will inherit this lighting, palette, and styling so composites feel like a single photoshoot."
-                      : "We're fine-tuning lighting, lenses, and palette based on your description. The preview appears here once ready."}
-                  </p>
+              <div className="relative aspect-[5/3] w-full overflow-hidden">
+                {backgroundUrl ? (
+                  <img
+                    src={backgroundUrl}
+                    alt={`AI background for ${displayName}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-transparent" />
+                <div className="absolute inset-0 flex flex-col justify-between p-8">
+                  <header>
+                    <p className="text-sm font-medium uppercase tracking-[0.3em] text-slate-300">Current background</p>
+                    <h2 className="mt-3 text-3xl font-semibold text-white">
+                      {backgroundReady ? displayName : "No backdrop yet"}
+                    </h2>
+                    <p className="mt-3 text-sm text-slate-300">
+                      {backgroundReady
+                        ? "Guests see this set the moment they upload."
+                        : "Generate an AI scene so every composite feels cohesive."}
+                    </p>
+                  </header>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={handleRefreshBackground}
+                      disabled={!canRefreshBackground}
+                      className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-500 to-blue-600 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:from-cyan-300 hover:via-sky-400 hover:to-blue-500 disabled:opacity-60"
+                    >
+                      {isGeneratingBackground
+                        ? "Rendering…"
+                        : backgroundReady
+                          ? "Regenerate background"
+                          : "Generate background"}
+                    </button>
+                    <p className="text-xs text-slate-400">
+                      Refresh anytime to remix the look. We'll keep guests in sync.
+                    </p>
+                  </div>
+
+                  {generateError && (
+                    <p className="text-sm text-rose-300">{generateError}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -135,7 +209,20 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
                   </p>
                 </div>
                 <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-slate-950/50 p-5">
-                  <img src={qrSrc} alt="QR code linking guests to the mobile booth" className="h-40 w-40 rounded-xl bg-white p-2" />
+                  {qrCodeSrc ? (
+                    <img
+                      src={qrCodeSrc}
+                      alt="QR code linking guests to the mobile booth"
+                      className="h-40 w-40 rounded-xl bg-white p-2"
+                    />
+                  ) : (
+                    <div className="flex h-40 w-40 items-center justify-center rounded-xl bg-white/70 font-medium text-slate-500">
+                      {qrCodeError ? "QR unavailable" : "Rendering QR…"}
+                    </div>
+                  )}
+                  {qrCodeError && (
+                    <p className="text-xs text-rose-200">{qrCodeError}</p>
+                  )}
                   <a
                     href={phoneUrl}
                     onClick={(event) => {
