@@ -35,6 +35,7 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   const [idealMemberSize, setIdealMemberSize] = useState(2);
   const [idealMemberSizeError, setIdealMemberSizeError] = useState<string | null>(null);
   const [idealMemberSizeUpdating, setIdealMemberSizeUpdating] = useState(false);
+  const [inProgressFauxtoCount, setInProgressFauxtoCount] = useState(0);
 
   const agent = useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
@@ -46,6 +47,7 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
       setBackgroundFilePath(state.backgroundFilePath);
       setUploadedCount(state.uploadedCount ?? 0);
       setFauxtoCount(state.fauxtoCount ?? 0);
+      setInProgressFauxtoCount(state.inProgressFauxtoCount ?? 0);
       setLatestFauxtos(state.latestFauxtos ?? []);
       setDisplayStatus(state.displayStatus);
       setIdealMemberSize(state.idealMemberSize ?? 2);
@@ -59,6 +61,7 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   const fauxtosLabel = fauxtoCount === 1 ? "Fauxto generated" : "Fauxtos generated";
   const latestFauxtoCount = latestFauxtos.length;
   const hasFauxtos = latestFauxtoCount > 0;
+  const statusMessage = displayStatus ?? "Scan the QR code to get started.";
   const [activeFauxtoIndex, setActiveFauxtoIndex] = useState(0);
   const activeFauxto = hasFauxtos
     ? latestFauxtos[activeFauxtoIndex % latestFauxtoCount]
@@ -234,34 +237,49 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
                   </p>
                   <p className="mt-1 text-xs uppercase tracking-[0.3em]">{fauxtosLabel}</p>
                 </div>
-              </div>
-              <div className="space-y-1 text-sm text-slate-400">
-                <p className="font-semibold text-white">People per Fauxto</p>
-                <div className="inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-slate-950/60 px-4 py-2">
-                  <button
-                    type="button"
-                    onClick={() => updateIdealMemberSize(idealMemberSize - 1)}
-                    disabled={idealMemberSize <= 1 || idealMemberSizeUpdating}
-                    className="rounded-full border border-white/20 px-2 py-1 text-white disabled:opacity-40"
-                  >
-                    –
-                  </button>
-                  <span className="text-2xl font-semibold text-white">{idealMemberSize}</span>
-                  <button
-                    type="button"
-                    onClick={() => updateIdealMemberSize(idealMemberSize + 1)}
-                    disabled={idealMemberSize >= 10 || idealMemberSizeUpdating}
-                    className="rounded-full border border-white/20 px-2 py-1 text-white disabled:opacity-40"
-                  >
-                    +
-                  </button>
+                <div>
+                  <p className="text-4xl font-semibold text-white">
+                    {inProgressFauxtoCount.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.3em]">In Progress</p>
                 </div>
-                {idealMemberSizeError && (
-                  <p className="text-xs text-rose-300">{idealMemberSizeError}</p>
-                )}
-                {displayStatus && (
-                  <p className="text-xs text-cyan-200">{displayStatus}</p>
-                )}
+              </div>
+              <div className="space-y-4 text-sm text-slate-400">
+                <div className="space-y-1">
+                  <p className="font-semibold text-white">People per Fauxto</p>
+                  <div className="inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-slate-950/60 px-4 py-2">
+                    <button
+                      type="button"
+                      onClick={() => updateIdealMemberSize(idealMemberSize - 1)}
+                      disabled={idealMemberSize <= 1 || idealMemberSizeUpdating}
+                      className="rounded-full border border-white/20 px-2 py-1 text-white disabled:opacity-40"
+                    >
+                      –
+                    </button>
+                    <span className="text-2xl font-semibold text-white">{idealMemberSize}</span>
+                    <button
+                      type="button"
+                      onClick={() => updateIdealMemberSize(idealMemberSize + 1)}
+                      disabled={idealMemberSize >= 10 || idealMemberSizeUpdating}
+                      className="rounded-full border border-white/20 px-2 py-1 text-white disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {idealMemberSizeError && (
+                    <p className="text-xs text-rose-300">{idealMemberSizeError}</p>
+                  )}
+                </div>
+                <div
+                  className="flex items-start gap-3 rounded-3xl border border-cyan-400/30 bg-gradient-to-r from-cyan-400/15 via-sky-500/10 to-indigo-500/15 px-4 py-3 text-sm text-cyan-50 shadow-lg shadow-cyan-500/10"
+                  aria-live="polite"
+                >
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-300 shadow shadow-cyan-500/40 animate-pulse" />
+                  <div className="space-y-1">
+                    <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-cyan-200">Status</p>
+                    <p className="text-base text-white">{statusMessage}</p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="shrink-0 text-center">

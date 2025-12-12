@@ -25,7 +25,7 @@ export function FooterBadge({ className = "" }: HTMLAttributes<HTMLDivElement>) 
             >
               {link.label}
             </a>
-            {index < topLinks.length - 1 && <span className="text-slate-500">·</span>}
+            {index < topLinks.length - 1 && <span className="text-slate-500">🤝</span>}
           </span>
         ))}
       </p>

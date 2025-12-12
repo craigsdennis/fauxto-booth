@@ -216,7 +216,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
         return;
       }
     }
-    this.updateDisplayStatus({displayStatus: `Snapping fauxtos. There are ${this.state.inProgressFauxtoCount} in progress`})
+    this.updateDisplayStatus({displayStatus: `📸 Snapping fauxtos`})
     await this.env.Fauxtographer.create({
       params: {
         agentName: this.name,
@@ -442,7 +442,10 @@ LIMIT ${limit};
     this.setState({
       ...this.state,
       inProgressFauxtoCount: this.state.inProgressFauxtoCount + by
-    })
+    });
+    if (this.state.inProgressFauxtoCount === 0) {
+      this.updateDisplayStatus({displayStatus: "Upload more selfies, or press the reshoot button to capture more fauxtos"})
+    }
   }
 
   @callable()
