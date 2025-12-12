@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAgent } from "agents/react";
 import type { Navigate } from "../navigation";
 import type { HubAgent, HubState, BoothDetail } from "../../worker/agents/hub";
@@ -40,9 +40,15 @@ export function HomePage({ navigate }: HomePageProps) {
     },
   });
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.title = "Fauxto Booth";
+  }, []);
+
   async function createBooth(formData: FormData) {
     const displayName = ((formData.get("display-name") as string) ?? "").trim();
     const description = ((formData.get("description") as string) ?? "").trim();
+    const hostName = window.location.hostname;
 
     if (!displayName) {
       setFormStatus({
@@ -55,14 +61,19 @@ export function HomePage({ navigate }: HomePageProps) {
     if (!agent?.stub) {
       setFormStatus({
         status: "error",
-        message: "Connecting to the Fauxto Booth engine. Try again in a moment.",
+        message:
+          "Connecting to the Fauxto Booth engine. Try again in a moment.",
       });
       return;
     }
 
     try {
       setFormStatus({ status: "pending" });
-      const boothSlug = await agent.stub.createBooth({ displayName, description });
+      const boothSlug = await agent.stub.createBooth({
+        displayName,
+        description,
+        hostName,
+      });
       setFormStatus({ status: "success", boothName: displayName, boothSlug });
       formRef.current?.reset();
       navigate(`/booths/${boothSlug}`);
@@ -70,7 +81,9 @@ export function HomePage({ navigate }: HomePageProps) {
       setFormStatus({
         status: "error",
         message:
-          error instanceof Error ? error.message : "Something went wrong while saving your booth.",
+          error instanceof Error
+            ? error.message
+            : "Something went wrong while saving your booth.",
       });
     }
   }
@@ -90,11 +103,13 @@ export function HomePage({ navigate }: HomePageProps) {
               fauxto booth
             </p>
             <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Launch a virtual booth where every guest looks like they posed together.
+              Launch a virtual booth where every guest looks like they posed
+              together.
             </h1>
             <p className="mt-5 text-base text-slate-300 sm:text-lg">
-              Spin up custom AI-powered photo booths for weddings, launches, or fandom meetups. Guests drop selfies,
-              and Fauxto Booth blends them into consistent, on-theme portraits in seconds.
+              Spin up custom AI-powered photo booths for weddings, launches, or
+              fandom meetups. Guests drop selfies, and Fauxto Booth blends them
+              into consistent, on-theme portraits in seconds.
             </p>
           </header>
 
@@ -102,17 +117,25 @@ export function HomePage({ navigate }: HomePageProps) {
             <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-8 shadow-2xl shadow-black/30 backdrop-blur-sm sm:p-10">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Create a booth</h2>
-                  <p className="text-sm text-slate-400">Set the vibe and we will take care of the compositing magic.</p>
+                  <h2 className="text-xl font-semibold text-white">
+                    Create a booth
+                  </h2>
+                  <p className="text-sm text-slate-400">
+                    Set the vibe and we will take care of the compositing magic.
+                  </p>
                 </div>
-                <span className="rounded-full border border-cyan-400/40 px-3 py-1 text-xs font-medium text-cyan-300">
-                  Live beta
-                </span>
               </div>
 
-              <form ref={formRef} action={createBooth} className="mt-8 space-y-6">
+              <form
+                ref={formRef}
+                action={createBooth}
+                className="mt-8 space-y-6"
+              >
                 <div>
-                  <label className="text-sm font-medium text-white" htmlFor="display-name">
+                  <label
+                    className="text-sm font-medium text-white"
+                    htmlFor="display-name"
+                  >
                     Booth name
                   </label>
                   <input
@@ -125,7 +148,10 @@ export function HomePage({ navigate }: HomePageProps) {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-white" htmlFor="description">
+                  <label
+                    className="text-sm font-medium text-white"
+                    htmlFor="description"
+                  >
                     Describe the look (optional)
                   </label>
                   <textarea
@@ -136,7 +162,8 @@ export function HomePage({ navigate }: HomePageProps) {
                     className="mt-2 w-full rounded-2xl border border-white/15 bg-slate-950/60 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
                   />
                   <p className="mt-2 text-xs text-slate-400">
-                    The more specific the vibe, the more consistent your generated group shots will be.
+                    The more specific the vibe, the more consistent your
+                    generated group shots will be.
                   </p>
                 </div>
 
@@ -145,12 +172,15 @@ export function HomePage({ navigate }: HomePageProps) {
                   disabled={formStatus.status === "pending"}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-500 to-blue-600 px-5 py-3 text-base font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:from-cyan-300 hover:via-sky-400 hover:to-blue-500 disabled:opacity-60"
                 >
-                  {formStatus.status === "pending" ? "Creating booth…" : "Launch booth"}
+                  {formStatus.status === "pending"
+                    ? "Creating booth…"
+                    : "Launch booth"}
                 </button>
 
                 {formStatus.status === "success" && (
                   <div className="rounded-2xl border border-emerald-400/50 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
-                    Booth "{formStatus.boothName}" is live. Share the link: fauxto.ai/booth/{formStatus.boothSlug}
+                    Booth "{formStatus.boothName}" is live. Share the link:
+                    fauxto.ai/booth/{formStatus.boothSlug}
                   </div>
                 )}
 
@@ -164,10 +194,13 @@ export function HomePage({ navigate }: HomePageProps) {
 
             <aside className="space-y-6">
               <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Latest booths</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">
+                  Latest booths
+                </h2>
                 {latestBooths.length === 0 ? (
                   <p className="mt-6 text-sm text-slate-400">
-                    Your first booth will show up here. We keep the 10 most recent creations pinned for quick access.
+                    Your first booth will show up here. We keep the 10 most
+                    recent creations pinned for quick access.
                   </p>
                 ) : (
                   <ul className="mt-6 space-y-3">
@@ -177,8 +210,12 @@ export function HomePage({ navigate }: HomePageProps) {
                         className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3"
                       >
                         <div>
-                          <p className="text-sm font-medium text-white">{booth.displayName}</p>
-                          <p className="text-xs text-slate-400">/{booth.name}</p>
+                          <p className="text-sm font-medium text-white">
+                            {booth.displayName}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            /{booth.name}
+                          </p>
                         </div>
                         <button
                           type="button"
@@ -194,12 +231,21 @@ export function HomePage({ navigate }: HomePageProps) {
               </section>
 
               <section className="rounded-3xl border border-white/10 bg-slate-900/40 p-6">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">How it works</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+                  How it works
+                </h2>
                 <dl className="mt-6 space-y-4">
                   {creationSteps.map((step) => (
-                    <div key={step.title} className="rounded-2xl bg-slate-950/60 p-4">
-                      <dt className="text-base font-semibold text-white">{step.title}</dt>
-                      <dd className="mt-2 text-sm text-slate-400">{step.body}</dd>
+                    <div
+                      key={step.title}
+                      className="rounded-2xl bg-slate-950/60 p-4"
+                    >
+                      <dt className="text-base font-semibold text-white">
+                        {step.title}
+                      </dt>
+                      <dd className="mt-2 text-sm text-slate-400">
+                        {step.body}
+                      </dd>
                     </div>
                   ))}
                 </dl>

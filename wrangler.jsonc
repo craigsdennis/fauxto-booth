@@ -32,6 +32,10 @@
 				"class_name": "BoothAgent",
 				"name": "BoothAgent",
 			},
+			{
+				"class_name": "FauxtoAgent",
+				"name": "FauxtoAgent",
+			},
 		],
 	},
 	"migrations": [
@@ -39,7 +43,8 @@
 			"tag": "v1",
 			"new_sqlite_classes": [
 				"HubAgent",
-				"BoothAgent"
+				"BoothAgent",
+				"FauxtoAgent"
 			],
 		},
 	],
@@ -48,7 +53,12 @@
 			"binding": "Backgrounder",
 			"class_name": "Backgrounder",
 			"name": "Backgrounder",
-		}
+		},
+    {
+			"binding": "Fauxtographer",
+			"class_name": "Fauxtographer",
+			"name": "Fauxtographer",
+    }
 	]
 	/**
    * Smart Placement

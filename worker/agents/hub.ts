@@ -34,16 +34,16 @@ export class HubAgent extends Agent<Env, HubState> {
     const base = this.slugify(displayName) || "booth";
 
     // Get all matching slugs: base, base-2, base-3, etc.
-    const slugs = this.sql<string>`
+    const rows = this.sql<{ slug: string }>`
     SELECT slug
     FROM booths
     WHERE slug = ${base}
        OR slug LIKE ${base + "-%"}`;
 
-    if (!slugs || slugs.length === 0) {
+    if (rows.length === 0) {
       return base;
     }
-
+    const slugs = rows.map((r) => r.slug);
     const existing = new Set(slugs);
 
     // If plain base isn't taken, use it.
@@ -71,21 +71,30 @@ export class HubAgent extends Agent<Env, HubState> {
   }
 
   @callable()
-  async createBooth({ displayName, description }: { displayName: string, description: string }) {
+  async createBooth({
+    displayName,
+    description,
+    hostName
+  }: {
+    displayName: string;
+    description: string;
+    hostName: string;
+  }) {
     const boothSlug = await this.generateUniqueBoothSlug(displayName);
     const booth = await getAgentByName(this.env.BoothAgent, boothSlug);
     // Save the booth
-    await booth.setup({displayName, description});
+    await booth.setup({ displayName, description, hostName });
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    this.sql`INSERT INTO booths (slug, displayName) VALUES (${boothSlug}, ${displayName});`;
+    this
+      .sql`INSERT INTO booths (slug, displayName) VALUES (${boothSlug}, ${displayName});`;
     // Prepend the state
     const latestBooths = this.state.latestBooths;
-    latestBooths.unshift({name: boothSlug, displayName});
+    latestBooths.unshift({ name: boothSlug, displayName });
     this.setState({
-        ...this.state,
-        // 10 most recent
-        latestBooths: latestBooths.slice(0, 10)
-    })
+      ...this.state,
+      // 10 most recent
+      latestBooths: latestBooths.slice(0, 10),
+    });
     return boothSlug;
   }
 }
