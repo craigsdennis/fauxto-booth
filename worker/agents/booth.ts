@@ -216,7 +216,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
         return;
       }
     }
-    this.updateDisplayStatus({displayStatus: "Snapping fauxtos. There are "})
+    this.updateDisplayStatus({displayStatus: `Snapping fauxtos. There are ${this.state.inProgressFauxtoCount} in progress`})
     await this.env.Fauxtographer.create({
       params: {
         agentName: this.name,
@@ -343,33 +343,68 @@ export class BoothAgent extends Agent<Env, BoothState> {
 
   getSuggestedUploads({ limit }: { limit: number }): Upload[] {
     const results = this.sql<Upload>`
-      SELECT
-        u.id,
-        u.postedByUserId,
-        u.filePath,
-        u.createdAt,
-        COUNT(fm.id) AS usageCount
-      FROM uploads u
-      LEFT JOIN fauxto_members fm ON fm.uploadId = u.id
-      GROUP BY u.id
-      ORDER BY usageCount ASC, u.createdAt ASC`;
+WITH
+-- Per-user: how many distinct fauxtos they've appeared in,
+-- and how long they've been waiting (oldest upload timestamp).
+user_stats AS (
+  SELECT
+    u.postedByUserId,
+    COUNT(DISTINCT fm.fauxtoId) AS userFauxtoCount,
+    MIN(u.createdAt)            AS oldestUploadCreatedAt
+  FROM uploads u
+  LEFT JOIN fauxto_members fm ON fm.uploadId = u.id
+  GROUP BY u.postedByUserId
+),
+
+-- Per-upload: how many times each upload has been used.
+upload_usage AS (
+  SELECT
+    u.id,
+    u.postedByUserId,
+    u.filePath,
+    u.createdAt,
+    COUNT(fm.id) AS uploadUsageCount
+  FROM uploads u
+  LEFT JOIN fauxto_members fm ON fm.uploadId = u.id
+  GROUP BY u.id
+),
+
+-- Pick ONE upload per user (their "best" candidate upload),
+-- with random tie-breaks inside each user.
+ranked AS (
+  SELECT
+    uu.*,
+    us.userFauxtoCount,
+    us.oldestUploadCreatedAt,
+    ROW_NUMBER() OVER (
+      PARTITION BY uu.postedByUserId
+      ORDER BY uu.uploadUsageCount ASC, uu.createdAt ASC, RANDOM()
+    ) AS rn
+  FROM upload_usage uu
+  JOIN user_stats us ON us.postedByUserId = uu.postedByUserId
+)
+
+SELECT
+  id,
+  postedByUserId,
+  filePath,
+  createdAt,
+  uploadUsageCount,
+  userFauxtoCount,
+  oldestUploadCreatedAt
+FROM ranked
+WHERE rn = 1
+ORDER BY
+  userFauxtoCount ASC,          -- least in fauxtos first
+  oldestUploadCreatedAt ASC,    -- waiting longest first
+  RANDOM()                      -- randomize true ties;
+LIMIT ${limit};
+`;
     if (!results || results.length === 0) {
       return [];
     }
-    const uploads: Upload[] = [];
-    const seenUsers = new Set<string>();
 
-    for (const row of results) {
-      if (uploads.length >= limit) break;
-
-      // Skip if we've already picked this user in this batch
-      if (seenUsers.has(row.postedByUserId)) continue;
-
-      seenUsers.add(row.postedByUserId);
-      uploads.push(row);
-    }
-
-    return uploads;
+    return results;
   }
 
   async onRequest(request: Request): Promise<Response> {
@@ -403,6 +438,13 @@ export class BoothAgent extends Agent<Env, BoothState> {
     return await this.snapFauxto({reshoot: true});
   }
 
+  changeInProgressFauxtoCount({by}: {by: number}) {
+    this.setState({
+      ...this.state,
+      inProgressFauxtoCount: this.state.inProgressFauxtoCount + by
+    })
+  }
+
   @callable()
   async setIdealMemberSize({ idealMemberSize }: { idealMemberSize: number }) {
     const size = Math.max(1, Math.min(Math.round(idealMemberSize), 10));
@@ -415,18 +457,4 @@ export class BoothAgent extends Agent<Env, BoothState> {
     return size;
   }
 
-  @callable()
-  async getFauxtoDetails({ fauxtoId }: { fauxtoId: string }) {
-    const row = this.sql<{ filePath: string; createdAt: string }>`SELECT filePath, createdAt FROM fauxtos WHERE id = ${fauxtoId}`;
-    if (!row || row.length === 0) {
-      throw new Error("Fauxto not found");
-    }
-    return {
-      filePath: row[0].filePath,
-      createdAt: row[0].createdAt,
-      boothName: this.name,
-      displayName: this.state.displayName,
-      hostName: this.state.hostName,
-    };
-  }
 }

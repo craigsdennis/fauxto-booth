@@ -19,7 +19,9 @@ export class Fauxtographer extends WorkflowEntrypoint<
   ) {
     const { agentName } = event.payload;
     const agent = await getAgentByName(this.env.BoothAgent, agentName);
+
     const fauxtoId = await step.do("Preparing next fauxto", async () => {
+      await agent.changeInProgressFauxtoCount({by: 1});
       return await agent.prepareFauxto({workflowInstanceId: event.instanceId});
     });
     const url = await step.do(`Generate fauxto ${fauxtoId}`, async () => {
@@ -30,8 +32,9 @@ export class Fauxtographer extends WorkflowEntrypoint<
       await agent.storePhoto({ url, filePath });
       return filePath;
     });
-    const fauxto = await step.do("Update fauxtos", async () => {
-        return await agent.updateFauxto({fauxtoId, filePath});
+    await step.do("Update fauxtos", async () => {
+        await agent.updateFauxto({fauxtoId, filePath});
+        await agent.changeInProgressFauxtoCount({by: -1});
     });
 
   }
