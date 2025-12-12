@@ -199,6 +199,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
         console.warn(
           `Only ${awaiting} awaiting, want ${this.state.idealMemberSize}.`
         );
+        this.updateDisplayStatus({displayStatus: "Waiting for a few more"});
         // ...schedule a call in 10 seconds to try again
         const scheduled = this.getSchedules().some(
           (s) => s.callback === "snapFauxto"
@@ -210,6 +211,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
         return;
       }
     }
+    this.updateDisplayStatus({displayStatus: "You look great! Creating Fauxto"})
     await this.env.Fauxtographer.create({
       params: {
         agentName: this.name,
