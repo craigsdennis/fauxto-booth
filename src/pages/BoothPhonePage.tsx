@@ -337,7 +337,6 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan-300/80">Selfie Station</p>
           <h1 className="text-3xl font-semibold text-white">{displayName}</h1>
           <p className="text-sm text-slate-400">{description}</p>
-          <p className="text-xs text-cyan-200/70">User ID cookie: {userId ?? "not set"}</p>
           <a
             href={smsInviteLink}
             className="inline-flex items-center justify-center text-xs font-semibold text-cyan-300 hover:text-cyan-200"

@@ -3,6 +3,7 @@ import * as QRCode from "qrcode";
 import { useAgent } from "agents/react";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
+import { FooterBadge } from "../partials/FooterBadge";
 
 function createAbsoluteUrl(path: string) {
   const normalized = path.startsWith("/") ? path : `/${path}`;
@@ -21,8 +22,8 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [qrCodeSrc, setQrCodeSrc] = useState<string | null>(null);
   const [qrCodeError, setQrCodeError] = useState<string | null>(null);
-  const [isSnappingPhoto, setIsSnappingPhoto] = useState(false);
-  const [snapPhotoError, setSnapPhotoError] = useState<string | null>(null);
+  const [isReshooting, setIsReshooting] = useState(false);
+  const [reshootError, setReshootError] = useState<string | null>(null);
   const [backgroundImageStatus, setBackgroundImageStatus] = useState<BoothState["backgroundImageStatus"]>("ready");
   const [backgroundFilePath, setBackgroundFilePath] = useState<string | undefined>(undefined);
   const [displayName, setDisplayName] = useState(slug);
@@ -163,24 +164,24 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
     }
   }
 
-  async function handleSnapPhoto() {
-    if (!agent?.stub?.snapPhotos) {
-      setSnapPhotoError("Connecting to the booth—try again in a beat.");
+  async function handleReshoot() {
+    if (!agent?.stub?.reshoot) {
+      setReshootError("Connecting to the booth—try again in a beat.");
       return;
     }
 
     try {
-      setSnapPhotoError(null);
-      setIsSnappingPhoto(true);
-      await agent.stub.snapPhotos();
+      setReshootError(null);
+      setIsReshooting(true);
+      await agent.stub.reshoot();
     } catch (error) {
-      setSnapPhotoError(
+      setReshootError(
         error instanceof Error
           ? error.message
           : "We couldn't take that snap. Please try again.",
       );
     } finally {
-      setIsSnappingPhoto(false);
+      setIsReshooting(false);
     }
   }
 
@@ -201,8 +202,8 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   }, [hasFauxtos, latestFauxtoCount]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="relative isolate overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
+      <div className="relative isolate flex-1 overflow-hidden pb-32">
         <div className="pointer-events-none absolute inset-0 opacity-50">
           <div className="absolute -top-32 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-cyan-500/20 blur-[120px]" />
           <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-indigo-500/20 blur-[140px]" />
@@ -258,6 +259,9 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
                 {idealMemberSizeError && (
                   <p className="text-xs text-rose-300">{idealMemberSizeError}</p>
                 )}
+                {displayStatus && (
+                  <p className="text-xs text-cyan-200">{displayStatus}</p>
+                )}
               </div>
             </div>
             <div className="shrink-0 text-center">
@@ -279,12 +283,6 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
               )}
             </div>
           </div>
-
-          {displayStatus && (
-            <div className="mt-6 rounded-3xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 text-sm text-cyan-100 shadow-lg shadow-cyan-500/20">
-              {displayStatus}
-            </div>
-          )}
 
           <div className="mt-6 overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/40 shadow-2xl shadow-black/50">
             <div className="relative aspect-[5/3] w-full overflow-hidden">
@@ -313,19 +311,19 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={handleSnapPhoto}
-                    disabled={isSnappingPhoto}
+                    onClick={handleReshoot}
+                    disabled={isReshooting}
                     className="inline-flex items-center justify-center rounded-2xl border border-white/20 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/40 disabled:opacity-60"
                   >
-                    {isSnappingPhoto ? "Snapping…" : "Snap Fauxtos"}
+                    {isReshooting ? "Reshooting…" : "Reshoot"}
                   </button>
                 </div>
 
                 {generateError && (
                   <p className="text-sm text-rose-300">{generateError}</p>
                 )}
-                {snapPhotoError && (
-                  <p className="text-sm text-rose-300">{snapPhotoError}</p>
+                {reshootError && (
+                  <p className="text-sm text-rose-300">{reshootError}</p>
                 )}
               </div>
             </div>
@@ -399,6 +397,8 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
             )}
           </section>
         </div>
+
+        <FooterBadge className="mx-auto mt-12 w-full max-w-5xl" />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { getAgentByName } from "agents";
 import { BoothAgent } from "./agents/booth";
 import { HubAgent } from "./agents/hub";
 import { FauxtoAgent } from "./agents/fauxto";
@@ -46,5 +47,54 @@ app.get("/api/images/*", async (c) => {
 
 // Exposes /agents/<namespace>/<name> to onRequest
 app.use("*", agentsMiddleware());
+
+
+app.get('/share/fauxtos/:id', async (c) => {
+  const fauxtoId = c.req.param('id');
+  try {
+    const fauxtoAgent = await getAgentByName(c.env.FauxtoAgent, fauxtoId);
+    const state = await fauxtoAgent.state;
+    const url = new URL(c.req.url);
+    const origin = `${url.protocol}//${url.host}`;
+    const canonical = `${origin}/fauxtos/${encodeURIComponent(fauxtoId)}`;
+    const imageUrl = state.filePath ? `${origin}/api/images/${state.filePath}` : null;
+    const parentBoothName = state.parentBoothName; 
+    let boothTitle = parentBoothName || 'Fauxto Booth';
+    if (parentBoothName) {
+      try {
+        const boothAgent = await getAgentByName(c.env.BoothAgent, parentBoothName);
+        const displayName = await boothAgent.state.displayName;
+        boothTitle = displayName || parentBoothName;
+      } catch (error) {
+        console.warn('Unable to load booth agent for share view', error);
+      }
+    }
+    const description = imageUrl ? `Come take a fake photo with me.` : 'Stay tuned for the finished Fauxto.';
+    const twitterCard = imageUrl ? 'summary_large_image' : 'summary';
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${boothTitle}</title>
+    <meta property="og:title" content="${boothTitle}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${canonical}" />
+    ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
+    <meta name="twitter:title" content="${boothTitle}" />
+    <meta name="twitter:description" content="${description}" />
+    ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
+    <meta name="twitter:card" content="${twitterCard}" />
+    <meta http-equiv="refresh" content="0; url=${canonical}" />
+  </head>
+  <body>
+    <p>Redirecting to your Fauxto...</p>
+  </body>
+</html>`;
+    return c.html(html);
+  } catch (error) {
+    console.error('Share view error', error);
+    return c.notFound();
+  }
+});
 
 export default app;

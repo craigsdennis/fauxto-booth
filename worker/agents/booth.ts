@@ -29,6 +29,7 @@ export type BoothState = {
   hostName?: string;
   displayStatus: string;
   fauxtoCount: number;
+  inProgressFauxtoCount: number;
   latestFauxtos: FauxtoDetail[];
 };
 
@@ -40,6 +41,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
     uploadedCount: 0,
     idealMemberSize: 2,
     fauxtoCount: 0,
+    inProgressFauxtoCount: 0,
     latestFauxtos: []
   };
 
@@ -214,7 +216,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
         return;
       }
     }
-    this.updateDisplayStatus({displayStatus: "You look great! Creating Fauxto"})
+    this.updateDisplayStatus({displayStatus: "Snapping fauxtos. There are "})
     await this.env.Fauxtographer.create({
       params: {
         agentName: this.name,
@@ -397,13 +399,34 @@ export class BoothAgent extends Agent<Env, BoothState> {
   }
 
   @callable()
+  async reshoot() {
+    return await this.snapFauxto({reshoot: true});
+  }
+
+  @callable()
   async setIdealMemberSize({ idealMemberSize }: { idealMemberSize: number }) {
     const size = Math.max(1, Math.min(Math.round(idealMemberSize), 10));
     this.setState({
       ...this.state,
       idealMemberSize: size,
     });
+    // Side effect, run a test to see if we can get folks
     await this.snapFauxto({reshoot: false});
     return size;
+  }
+
+  @callable()
+  async getFauxtoDetails({ fauxtoId }: { fauxtoId: string }) {
+    const row = this.sql<{ filePath: string; createdAt: string }>`SELECT filePath, createdAt FROM fauxtos WHERE id = ${fauxtoId}`;
+    if (!row || row.length === 0) {
+      throw new Error("Fauxto not found");
+    }
+    return {
+      filePath: row[0].filePath,
+      createdAt: row[0].createdAt,
+      boothName: this.name,
+      displayName: this.state.displayName,
+      hostName: this.state.hostName,
+    };
   }
 }

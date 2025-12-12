@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAgent } from "agents/react";
 import type { Navigate } from "../navigation";
 import type { HubAgent, HubState, BoothDetail } from "../../worker/agents/hub";
+import { FooterBadge } from "../partials/FooterBadge";
 
 type FormStatus =
   | { status: "idle" }
@@ -94,8 +95,8 @@ export function HomePage({ navigate }: HomePageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="relative isolate overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
+      <div className="relative isolate flex-1 overflow-hidden pb-40">
         <div className="pointer-events-none absolute inset-0 opacity-60">
           <div className="absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/30 blur-[120px]" />
           <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-pink-500/20 blur-[120px]" />
@@ -279,6 +280,8 @@ export function HomePage({ navigate }: HomePageProps) {
             </aside>
           </div>
         </div>
+
+        <FooterBadge className="mx-auto mt-16 w-full max-w-6xl" />
       </div>
     </div>
   );
