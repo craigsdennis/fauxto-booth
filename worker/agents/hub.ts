@@ -74,16 +74,18 @@ export class HubAgent extends Agent<Env, HubState> {
   async createBooth({
     displayName,
     description,
-    hostName
+    hostName,
+    idealMemberSize
   }: {
     displayName: string;
     description: string;
     hostName: string;
+    idealMemberSize: number;
   }) {
     const boothSlug = await this.generateUniqueBoothSlug(displayName);
     const booth = await getAgentByName(this.env.BoothAgent, boothSlug);
     // Save the booth
-    await booth.setup({ displayName, description, hostName });
+    await booth.setup({ displayName, description, hostName, idealMemberSize });
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this
       .sql`INSERT INTO booths (slug, displayName) VALUES (${boothSlug}, ${displayName});`;

@@ -26,6 +26,13 @@ Okay we had a bit of a restructure... The Phone page will now get a message thro
 - Fallbacks now use `state.latestFauxtos` when the guest hasn't been tagged yet, and helper copy clarifies whether they're seeing their own renders or the general stream.
 
 ## Additional User Request (verbatim)
+I would like to remove any time we offer an upload, I want only photos taken. Let's rename that on page to Selfie Station.
+
+## What I Delivered (update)
+- Removed the gallery/file-picker flows so guests can only capture via the in-page camera; any device without camera support now sees guidance to switch devices.
+- Rebranded the hero badge to "Selfie Station" and trimmed copy/buttons to reflect the capture-only experience.
+
+## Additional User Request (verbatim)
 Let's get all the state setting off the state object in the onStateUpdate. Do not break it out into setBoothState. Set properties on the page from the agent state in the onStateUpdate method only.
 
 ## What I Delivered (update)

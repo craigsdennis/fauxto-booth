@@ -48,7 +48,11 @@ export function HomePage({ navigate }: HomePageProps) {
   async function createBooth(formData: FormData) {
     const displayName = ((formData.get("display-name") as string) ?? "").trim();
     const description = ((formData.get("description") as string) ?? "").trim();
-    const hostName = window.location.hostname;
+    const rawIdealMemberSize = Number(formData.get("ideal-member-size"));
+    const idealMemberSize = Number.isFinite(rawIdealMemberSize)
+      ? Math.max(1, Math.min(Math.round(rawIdealMemberSize), 10))
+      : 2;
+    const hostName = typeof window !== "undefined" ? window.location.hostname : "";
 
     if (!displayName) {
       setFormStatus({
@@ -73,6 +77,7 @@ export function HomePage({ navigate }: HomePageProps) {
         displayName,
         description,
         hostName,
+        idealMemberSize,
       });
       setFormStatus({ status: "success", boothName: displayName, boothSlug });
       formRef.current?.reset();
@@ -164,6 +169,27 @@ export function HomePage({ navigate }: HomePageProps) {
                   <p className="mt-2 text-xs text-slate-400">
                     The more specific the vibe, the more consistent your
                     generated group shots will be.
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    className="text-sm font-medium text-white"
+                    htmlFor="ideal-member-size"
+                  >
+                    People per Fauxto
+                  </label>
+                  <input
+                    id="ideal-member-size"
+                    name="ideal-member-size"
+                    type="number"
+                    min={1}
+                    max={10}
+                    defaultValue={2}
+                    className="mt-2 w-full rounded-2xl border border-white/15 bg-slate-950/60 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                  />
+                  <p className="mt-2 text-xs text-slate-400">
+                    We'll wait for this many guests before snapping each composite.
                   </p>
                 </div>
 

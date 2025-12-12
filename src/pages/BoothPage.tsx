@@ -31,6 +31,9 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   const [fauxtoCount, setFauxtoCount] = useState(0);
   const [latestFauxtos, setLatestFauxtos] = useState<BoothState["latestFauxtos"]>([]);
   const [displayStatus, setDisplayStatus] = useState<string | undefined>(undefined);
+  const [idealMemberSize, setIdealMemberSize] = useState(2);
+  const [idealMemberSizeError, setIdealMemberSizeError] = useState<string | null>(null);
+  const [idealMemberSizeUpdating, setIdealMemberSizeUpdating] = useState(false);
 
   const agent = useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
@@ -44,6 +47,7 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
       setFauxtoCount(state.fauxtoCount ?? 0);
       setLatestFauxtos(state.latestFauxtos ?? []);
       setDisplayStatus(state.displayStatus);
+      setIdealMemberSize(state.idealMemberSize ?? 2);
     },
   });
 
@@ -64,6 +68,8 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   const backgroundUrl = backgroundFilePath
     ? `/api/images/${backgroundFilePath}`
     : null;
+  const inviteMessage = `Come take a fake photo with me at ${phoneUrl} and we'll be added to ${displayName}`;
+  const smsInviteLink = `sms:&body=${encodeURIComponent(inviteMessage)}`;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -75,6 +81,35 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
       navigate(`/fauxtos/${encodeURIComponent(id)}`);
     },
     [navigate],
+  );
+
+  const updateIdealMemberSize = useCallback(
+    async (nextSize: number) => {
+      if (!agent?.stub?.setIdealMemberSize) {
+        setIdealMemberSizeError("Connecting to the booth—try again in a beat.");
+        return;
+      }
+
+      const safeSize = Math.max(1, Math.min(10, nextSize));
+      if (safeSize === idealMemberSize) return;
+
+      setIdealMemberSizeError(null);
+      setIdealMemberSize(safeSize);
+      setIdealMemberSizeUpdating(true);
+
+      try {
+        await agent.stub.setIdealMemberSize({ idealMemberSize: safeSize });
+      } catch (error) {
+        setIdealMemberSizeError(
+          error instanceof Error
+            ? error.message
+            : "We couldn't update that preference. Please try again.",
+        );
+      } finally {
+        setIdealMemberSizeUpdating(false);
+      }
+    },
+    [agent, idealMemberSize],
   );
 
   useEffect(() => {
@@ -199,9 +234,31 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
                   <p className="mt-1 text-xs uppercase tracking-[0.3em]">{fauxtosLabel}</p>
                 </div>
               </div>
-              {displayStatus && (
-                <p className="text-sm text-cyan-200">{displayStatus}</p>
-              )}
+              <div className="space-y-1 text-sm text-slate-400">
+                <p className="font-semibold text-white">People per Fauxto</p>
+                <div className="inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-slate-950/60 px-4 py-2">
+                  <button
+                    type="button"
+                    onClick={() => updateIdealMemberSize(idealMemberSize - 1)}
+                    disabled={idealMemberSize <= 1 || idealMemberSizeUpdating}
+                    className="rounded-full border border-white/20 px-2 py-1 text-white disabled:opacity-40"
+                  >
+                    –
+                  </button>
+                  <span className="text-2xl font-semibold text-white">{idealMemberSize}</span>
+                  <button
+                    type="button"
+                    onClick={() => updateIdealMemberSize(idealMemberSize + 1)}
+                    disabled={idealMemberSize >= 10 || idealMemberSizeUpdating}
+                    className="rounded-full border border-white/20 px-2 py-1 text-white disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
+                {idealMemberSizeError && (
+                  <p className="text-xs text-rose-300">{idealMemberSizeError}</p>
+                )}
+              </div>
             </div>
             <div className="shrink-0 text-center">
               <div className="rounded-3xl border border-white/15 bg-slate-950/80 p-4 shadow-2xl shadow-black/50">

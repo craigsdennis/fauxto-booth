@@ -31,6 +31,13 @@ Okay we had a bit of a restructure. Instead of fauxtos being on the state object
 - Added a status line under the booth stats that surfaces the agent's `displayStatus` so hosts can relay what's happening at a glance.
 
 ## Additional User Request (verbatim)
+And when the photo booth is created let's have the user set idealMemberSize. Let's show that on the booth and add a + and - button ...
+
+## What I Delivered (update)
+- Added a “people per Fauxto” input to the booth-creation form so hosts choose the desired crowd size upfront.
+- Exposed the current ideal member size on the Booth page with +/- controls that persist through the booth agent while optimistically updating the local state.
+
+## Additional User Request (verbatim)
 Let's get all the state setting off the state object in the onStateUpdate. Do not break it out into setBoothState. Set properties on the page from the agent state in the onStateUpdate method only.
 
 ## What I Delivered (update)

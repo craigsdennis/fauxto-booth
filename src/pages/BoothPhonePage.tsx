@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
 import { useAgent } from "agents/react";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
@@ -113,11 +112,18 @@ function parseAgentPayload(message: unknown) {
   return null;
 }
 
-const defaultDescription = "Snap or upload a selfie. We'll make it look like you're on set.";
+const defaultDescription = "Snap a selfie and we'll make it look like you're on set.";
+
+function createAbsoluteUrl(path: string) {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  if (typeof window === "undefined") {
+    return normalized;
+  }
+  return `${window.location.origin}${normalized}`;
+}
 
 export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ status: "idle" });
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [supportsCamera, setSupportsCamera] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -167,6 +173,12 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
     : hasFauxtos
       ? "We haven't spotted you yet—showing recent booth Fauxtos."
       : "We'll drop your Fauxtos here the second they're rendered.";
+  const phonePageUrl =
+    typeof window !== "undefined"
+      ? window.location.href
+      : createAbsoluteUrl(`/booths/${encodeURIComponent(slug)}/phone`);
+  const inviteMessage = `Come take a fake photo with me at ${phonePageUrl} and we'll be added to ${displayName}`;
+  const smsInviteLink = `sms:?&body=${encodeURIComponent(inviteMessage)}`;
 
   useEffect(() => {
     const ensured = ensureUserIdCookie();
@@ -190,10 +202,6 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
     },
     [navigate],
   );
-
-  const triggerFilePicker = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -220,9 +228,7 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
       const canUseCamera = typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
 
       if (!canUseCamera) {
-        if (!options?.silentFallback) {
-          triggerFilePicker();
-        }
+        setCameraError("This device can't provide a camera feed in the browser. Try another device.");
         return;
       }
 
@@ -244,14 +250,11 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
         setCameraError(
           error instanceof Error
             ? error.message
-            : "We couldn't access your camera. Please allow permissions or upload from your files.",
+            : "We couldn't access your camera. Please allow permissions and try again.",
         );
-        if (!options?.silentFallback) {
-          triggerFilePicker();
-        }
       }
     },
-    [cameraActive, triggerFilePicker],
+    [cameraActive],
   );
 
   useEffect(() => {
@@ -284,9 +287,6 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
       }
 
       setUploadStatus({ status: "success" });
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     } catch (error) {
       setUploadStatus({
         status: "error",
@@ -294,12 +294,6 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
           error instanceof Error ? error.message : "Something went wrong while uploading your selfie.",
       });
     }
-  }
-
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    void uploadSelfie(file);
   }
 
   async function capturePhoto() {
@@ -340,10 +334,16 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
     <div className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-4 py-6">
         <header className="space-y-2 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan-300/80">Phone booth</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan-300/80">Selfie Station</p>
           <h1 className="text-3xl font-semibold text-white">{displayName}</h1>
           <p className="text-sm text-slate-400">{description}</p>
           <p className="text-xs text-cyan-200/70">User ID cookie: {userId ?? "not set"}</p>
+          <a
+            href={smsInviteLink}
+            className="inline-flex items-center justify-center text-xs font-semibold text-cyan-300 hover:text-cyan-200"
+          >
+            Invite people to your fauxto shoot →
+          </a>
         </header>
 
         <section className="mt-6 flex flex-col gap-5 rounded-[32px] border border-white/10 bg-slate-900/70 p-5 shadow-xl shadow-black/40">
@@ -353,17 +353,17 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
               playsInline
               autoPlay
               muted
-              className={`h-full w-full object-cover transition-opacity duration-500 ${cameraActive ? "opacity-100" : "opacity-30"}`}
+              className={`h-full w-full -scale-x-100 object-cover transition-opacity duration-500 ${cameraActive ? "opacity-100" : "opacity-30"}`}
             />
             {!cameraActive && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-slate-400">
-                <p>{supportsCamera ? "Allow camera access so we can frame you instantly." : "Camera unavailable on this device. Upload instead."}</p>
+                <p>{supportsCamera ? "Allow camera access so we can frame you instantly." : "Camera unavailable on this device—try another phone."}</p>
                 <button
                   type="button"
                   onClick={() => startCamera()}
                   className="rounded-full border border-white/30 px-4 py-2 text-xs font-semibold text-white"
                 >
-                  {supportsCamera ? "Enable camera" : "Upload a selfie"}
+                  {supportsCamera ? "Enable camera" : "Switch device"}
                 </button>
               </div>
             )}
@@ -392,21 +392,7 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
             >
               {cameraActive ? "Pause camera" : supportsCamera ? "Retry camera" : "Prompt camera"}
             </button>
-            <button
-              type="button"
-              onClick={triggerFilePicker}
-              className="grow rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-white sm:grow-0"
-            >
-              Upload from photos
-            </button>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
 
           {cameraError && <p className="text-sm text-rose-300">{cameraError}</p>}
 
@@ -422,7 +408,7 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
             )}
           </div>
           <p className="text-center text-xs text-slate-500">
-            Selfies upload securely to {uploadEndpoint}. We only use them to generate the booth shot.
+            All photos are captured right here—no file uploads needed.
           </p>
         </section>
 

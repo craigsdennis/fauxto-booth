@@ -75,10 +75,12 @@ export class BoothAgent extends Agent<Env, BoothState> {
     displayName,
     description,
     hostName,
+    idealMemberSize,
   }: {
     displayName: string;
     description: string;
     hostName: string;
+    idealMemberSize: number;
   }) {
     // Update the state, auto broadcasts
     this.setState({
@@ -86,6 +88,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
       displayName,
       description,
       hostName,
+      idealMemberSize,
     });
     await this.refreshBackground();
   }
@@ -391,5 +394,16 @@ export class BoothAgent extends Agent<Env, BoothState> {
     });
     await this.snapFauxto({ reshoot: false });
     return Response.json({ success: true, uploadFileName });
+  }
+
+  @callable()
+  async setIdealMemberSize({ idealMemberSize }: { idealMemberSize: number }) {
+    const size = Math.max(1, Math.min(Math.round(idealMemberSize), 10));
+    this.setState({
+      ...this.state,
+      idealMemberSize: size,
+    });
+    await this.snapFauxto({reshoot: false});
+    return size;
   }
 }
