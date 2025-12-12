@@ -22,3 +22,17 @@ On the main booth page is there any way to make a slideshow about 5 seconds on e
 ## What I Delivered (update)
 - Added client-side slideshow state that advances through the Fauxtos array automatically every five seconds when at least two renders exist.
 - Featured the active Fauxto in a prominent carousel block above the gallery with progress text so hosts can rely on the automatic loop for signage or displays.
+
+## Additional User Request (verbatim)
+Okay we had a bit of a restructure. Instead of fauxtos being on the state object only the latestFauxtos will be there. You can still loop through them on a slideshow. There is also a fauxtoCount on the state which will be the total for the booth. ... On the booth agent there is now a displayStatus I'd like to show so people can see what is happening.
+
+## What I Delivered (update)
+- Pointed the host UI at `state.latestFauxtos` for both the slideshow and gallery, while keeping the counters wired to the new `fauxtoCount` total and showing how many renders exist overall.
+- Added a status line under the booth stats that surfaces the agent's `displayStatus` so hosts can relay what's happening at a glance.
+
+## Additional User Request (verbatim)
+Let's get all the state setting off the state object in the onStateUpdate. Do not break it out into setBoothState. Set properties on the page from the agent state in the onStateUpdate method only.
+
+## What I Delivered (update)
+- Replaced the single `boothState` blob with targeted React state slices (background info, counts, latest Fauxtos, etc.) and now update each from `onStateUpdate`, matching the new guidance.
+- Removed lingering dependencies on the raw state object so future data shape tweaks don't ripple through the UI logic.

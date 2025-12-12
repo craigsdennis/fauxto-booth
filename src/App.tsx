@@ -3,11 +3,13 @@ import type { Navigate } from "./navigation";
 import { HomePage } from "./pages/HomePage";
 import { BoothPage } from "./pages/BoothPage";
 import { BoothPhonePage } from "./pages/BoothPhonePage";
+import { FauxtoPage } from "./pages/FauxtoPage";
 
 type Route =
   | { type: "home" }
   | { type: "booth"; slug: string }
-  | { type: "booth-phone"; slug: string };
+  | { type: "booth-phone"; slug: string }
+  | { type: "fauxto"; fauxtoId: string };
 
 function normalizePath(path: string) {
   if (!path) return "/";
@@ -23,13 +25,20 @@ function parseRoute(path: string): Route {
   const normalized = normalizePath(path.replace(/\/+$/, ""));
   if (normalized === "/") return { type: "home" };
   const segments = normalized.split("/").filter(Boolean);
-  if (segments[0] !== "booths") return { type: "home" };
-  const slug = decodeURIComponent(segments[1] ?? "");
-  if (!slug) return { type: "home" };
-  if (segments[2] === "phone") {
-    return { type: "booth-phone", slug };
+  if (segments[0] === "booths") {
+    const slug = decodeURIComponent(segments[1] ?? "");
+    if (!slug) return { type: "home" };
+    if (segments[2] === "phone") {
+      return { type: "booth-phone", slug };
+    }
+    return { type: "booth", slug };
   }
-  return { type: "booth", slug };
+  if (segments[0] === "fauxtos") {
+    const fauxtoId = decodeURIComponent(segments[1] ?? "");
+    if (!fauxtoId) return { type: "home" };
+    return { type: "fauxto", fauxtoId };
+  }
+  return { type: "home" };
 }
 
 function useAppRouter() {
@@ -66,6 +75,10 @@ function App() {
 
   if (route.type === "booth-phone") {
     return <BoothPhonePage slug={route.slug} navigate={navigate} />;
+  }
+
+  if (route.type === "fauxto") {
+    return <FauxtoPage fauxtoId={route.fauxtoId} navigate={navigate} />;
   }
 
   return <HomePage navigate={navigate} />;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as QRCode from "qrcode";
 import { useAgent } from "agents/react";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
@@ -18,46 +18,64 @@ type BoothPageProps = {
 };
 
 export function BoothPage({ slug, navigate }: BoothPageProps) {
-  const [boothState, setBoothState] = useState<BoothState | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [qrCodeSrc, setQrCodeSrc] = useState<string | null>(null);
   const [qrCodeError, setQrCodeError] = useState<string | null>(null);
   const [isSnappingPhoto, setIsSnappingPhoto] = useState(false);
   const [snapPhotoError, setSnapPhotoError] = useState<string | null>(null);
+  const [backgroundImageStatus, setBackgroundImageStatus] = useState<BoothState["backgroundImageStatus"]>("ready");
+  const [backgroundFilePath, setBackgroundFilePath] = useState<string | undefined>(undefined);
+  const [displayName, setDisplayName] = useState(slug);
+  const [description, setDescription] = useState<string | undefined>(undefined);
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const [fauxtoCount, setFauxtoCount] = useState(0);
+  const [latestFauxtos, setLatestFauxtos] = useState<BoothState["latestFauxtos"]>([]);
+  const [displayStatus, setDisplayStatus] = useState<string | undefined>(undefined);
 
   const agent = useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
     name: slug,
     onStateUpdate(state) {
-      setBoothState(state);
+      setDisplayName(state.displayName || slug);
+      setDescription(state.description);
+      setBackgroundImageStatus(state.backgroundImageStatus ?? "ready");
+      setBackgroundFilePath(state.backgroundFilePath);
+      setUploadedCount(state.uploadedCount ?? 0);
+      setFauxtoCount(state.fauxtoCount ?? 0);
+      setLatestFauxtos(state.latestFauxtos ?? []);
+      setDisplayStatus(state.displayStatus);
     },
   });
 
-  const backgroundImageStatus = boothState?.backgroundImageStatus ?? "ready";
-  const backgroundReady = Boolean(boothState?.backgroundFilePath);
+  const backgroundReady = Boolean(backgroundFilePath);
   const isGeneratingBackground = backgroundImageStatus === "generating";
   const canRefreshBackground = backgroundImageStatus === "ready";
-  const displayName = boothState?.displayName || slug;
-  const description = boothState?.description;
-  const uploadedCount = boothState?.uploadedCount ?? 0;
   const uploadsLabel = uploadedCount === 1 ? "Upload captured" : "Uploads captured";
-  const fauxtos = boothState?.fauxtos ?? [];
-  const fauxtosGenerated = fauxtos.length;
-  const fauxtosLabel = fauxtosGenerated === 1 ? "Fauxto generated" : "Fauxtos generated";
-  const hasFauxtos = fauxtos.length > 0;
+  const fauxtosLabel = fauxtoCount === 1 ? "Fauxto generated" : "Fauxtos generated";
+  const latestFauxtoCount = latestFauxtos.length;
+  const hasFauxtos = latestFauxtoCount > 0;
   const [activeFauxtoIndex, setActiveFauxtoIndex] = useState(0);
-  const activeFauxto = hasFauxtos ? fauxtos[activeFauxtoIndex % fauxtos.length] : null;
+  const activeFauxto = hasFauxtos
+    ? latestFauxtos[activeFauxtoIndex % latestFauxtoCount]
+    : null;
   const boothPath = `/booths/${encodeURIComponent(slug)}`;
   const phonePath = `${boothPath}/phone`;
   const phoneUrl = createAbsoluteUrl(phonePath);
-  const backgroundUrl = boothState?.backgroundFilePath
-    ? `/api/images/${boothState.backgroundFilePath}`
+  const backgroundUrl = backgroundFilePath
+    ? `/api/images/${backgroundFilePath}`
     : null;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.title = `Fauxto Booth${displayName ? ` · ${displayName}` : ""}`;
   }, [displayName]);
+
+  const openFauxto = useCallback(
+    (id: string) => {
+      navigate(`/fauxtos/${encodeURIComponent(id)}`);
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     let active = true;
@@ -133,19 +151,19 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
 
   useEffect(() => {
     setActiveFauxtoIndex(0);
-  }, [fauxtos.length]);
+  }, [latestFauxtoCount]);
 
   useEffect(() => {
-    if (!hasFauxtos || fauxtos.length < 2 || typeof window === "undefined") {
+    if (!hasFauxtos || latestFauxtoCount < 2 || typeof window === "undefined") {
       return;
     }
     const interval = window.setInterval(() => {
-      setActiveFauxtoIndex((current) => (current + 1) % fauxtos.length);
+      setActiveFauxtoIndex((current) => (current + 1) % latestFauxtoCount);
     }, 5000);
     return () => {
       window.clearInterval(interval);
     };
-  }, [hasFauxtos, fauxtos.length]);
+  }, [hasFauxtos, latestFauxtoCount]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -176,11 +194,14 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
                 </div>
                 <div>
                   <p className="text-4xl font-semibold text-white">
-                    {fauxtosGenerated.toLocaleString()}
+                    {fauxtoCount.toLocaleString()}
                   </p>
                   <p className="mt-1 text-xs uppercase tracking-[0.3em]">{fauxtosLabel}</p>
                 </div>
               </div>
+              {displayStatus && (
+                <p className="text-sm text-cyan-200">{displayStatus}</p>
+              )}
             </div>
             <div className="shrink-0 text-center">
               <div className="rounded-3xl border border-white/15 bg-slate-950/80 p-4 shadow-2xl shadow-black/50">
@@ -202,7 +223,13 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
             </div>
           </div>
 
-          <div className="mt-10 overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/40 shadow-2xl shadow-black/50">
+          {displayStatus && (
+            <div className="mt-6 rounded-3xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 text-sm text-cyan-100 shadow-lg shadow-cyan-500/20">
+              {displayStatus}
+            </div>
+          )}
+
+          <div className="mt-6 overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/40 shadow-2xl shadow-black/50">
             <div className="relative aspect-[5/3] w-full overflow-hidden">
               {backgroundUrl ? (
                 <img
@@ -264,33 +291,50 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
                 <p className="text-sm text-slate-400">Every composite streams back here in real time.</p>
               </div>
               {hasFauxtos && (
-                <span className="text-xs font-medium text-slate-300">{fauxtosGenerated} ready</span>
+                <span className="text-xs font-medium text-slate-300">{fauxtoCount.toLocaleString()} ready</span>
               )}
             </div>
             {activeFauxto && (
               <div className="mt-5 overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/70 shadow-xl shadow-black/40">
-                <img
-                  key={activeFauxto.filePath}
-                  src={`/api/images/${activeFauxto.filePath}`}
-                  alt={`Featured Fauxto for ${displayName}`}
-                  className="h-80 w-full object-cover transition-all duration-700"
-                />
+                <button
+                  type="button"
+                  onClick={() => openFauxto(activeFauxto.fauxtoId)}
+                  className="group block w-full"
+                >
+                  <img
+                    key={activeFauxto.filePath}
+                    src={`/api/images/${activeFauxto.filePath}`}
+                    alt={`Featured Fauxto for ${displayName}`}
+                    className="h-80 w-full object-cover transition-all duration-700 group-hover:opacity-90"
+                  />
+                </button>
                 <div className="flex items-center justify-between px-6 py-4 text-xs text-slate-400">
-                  <span>Slideshow · {activeFauxtoIndex + 1} / {fauxtosGenerated}</span>
-                  <span>Updates every 5s</span>
+                  <span>Slideshow · {activeFauxtoIndex + 1} / {latestFauxtoCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => openFauxto(activeFauxto.fauxtoId)}
+                    className="text-cyan-300 hover:text-cyan-200"
+                  >
+                    Open Fauxto →
+                  </button>
                 </div>
               </div>
             )}
             {hasFauxtos ? (
               <div className="mt-5 grid gap-5 md:grid-cols-2">
-                {fauxtos.map((fauxto) => (
-                  <div key={fauxto.filePath} className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-900/70">
+                {latestFauxtos.map((fauxto) => (
+                  <button
+                    key={fauxto.filePath}
+                    type="button"
+                    onClick={() => openFauxto(fauxto.fauxtoId)}
+                    className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-900/70 text-left transition hover:border-cyan-400/40"
+                  >
                     <img
                       src={`/api/images/${fauxto.filePath}`}
                       alt={`Fauxto composite for ${displayName}`}
                       className="h-64 w-full object-cover"
                     />
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (

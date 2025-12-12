@@ -15,6 +15,19 @@ type UploadStatus =
   | { status: "success" }
   | { status: "error"; message: string };
 
+type FauxtoSummary = {
+  fauxtoId: string;
+  filePath: string;
+};
+
+type GalleryFauxto = FauxtoSummary;
+
+type FauxtoReadyMessage = {
+  type: "fauxtoReady";
+  fauxtoId: string;
+  filePath: string;
+};
+
 async function canvasToJpegBlob(canvas: HTMLCanvasElement) {
   if (canvas.toBlob) {
     return new Promise<Blob>((resolve, reject) => {
@@ -74,8 +87,35 @@ function ensureUserIdCookie() {
   return uuid;
 }
 
-export function BoothPhonePage({ slug, navigate: _navigate }: BoothPhonePageProps) {
-  const [boothState, setBoothState] = useState<BoothState | null>(null);
+function parseAgentPayload(message: unknown) {
+  if (typeof message === "string") {
+    try {
+      return JSON.parse(message);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof message === "object" && message !== null) {
+    if ("data" in message) {
+      const event = message as MessageEvent;
+      const { data } = event;
+      if (typeof data === "string") {
+        try {
+          return JSON.parse(data);
+        } catch {
+          return null;
+        }
+      }
+      return data;
+    }
+    return message;
+  }
+  return null;
+}
+
+const defaultDescription = "Snap or upload a selfie. We'll make it look like you're on set.";
+
+export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ status: "idle" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -88,34 +128,45 @@ export function BoothPhonePage({ slug, navigate: _navigate }: BoothPhonePageProp
   const autoStartAttemptedRef = useRef(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [expandedFauxto, setExpandedFauxto] = useState<string | null>(null);
+  const [myFauxtos, setMyFauxtos] = useState<FauxtoSummary[]>([]);
+  const [displayName, setDisplayName] = useState(slug);
+  const [description, setDescription] = useState(defaultDescription);
+  const [latestFauxtos, setLatestFauxtos] = useState<BoothState["latestFauxtos"]>([]);
 
   useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
     name: slug,
     onStateUpdate(state) {
-      // TODO: Unwrap
-      setBoothState(state);
+      setDisplayName(state.displayName || slug);
+      setDescription(state.description ?? defaultDescription);
+      setLatestFauxtos(state.latestFauxtos ?? []);
     },
-    onMessage(event) {
-      console.log(event);
-    }
+    onMessage(message) {
+      const payload = parseAgentPayload(message) as Partial<FauxtoReadyMessage> | null;
+      if (
+        payload?.type === "fauxtoReady" &&
+        typeof payload.filePath === "string" &&
+        typeof payload.fauxtoId === "string"
+      ) {
+        setMyFauxtos((current) => {
+          if (current.some((item) => item.fauxtoId === payload.fauxtoId)) {
+            return current;
+          }
+          return [{ fauxtoId: payload.fauxtoId, filePath: payload.filePath }, ...current].slice(0, 20);
+        });
+      }
+    },
   });
 
-  const displayName = boothState?.displayName || slug;
-  const description = boothState?.description || "Snap or upload a selfie. We'll make it look like you're on set.";
   const uploadEndpoint = `/agents/booth-agent/${encodeURIComponent(slug)}`;
-  const fauxtos = boothState?.fauxtos ?? [];
-  const personalFauxtos = userId
-    ? fauxtos.filter((fauxto) => Array.isArray(fauxto.members) && fauxto.members.includes(userId))
-    : fauxtos;
-  const showingAllFallback = Boolean(userId && personalFauxtos.length === 0);
-  const galleryFauxtos = showingAllFallback ? fauxtos : personalFauxtos;
+  const hasPersonalFauxtos = myFauxtos.length > 0;
+  const galleryFauxtos: GalleryFauxto[] = hasPersonalFauxtos ? myFauxtos : latestFauxtos;
   const hasFauxtos = galleryFauxtos.length > 0;
-  const fauxtoHelperText = userId
-    ? showingAllFallback
+  const fauxtoHelperText = hasPersonalFauxtos
+    ? "Only the Fauxtos you're in appear below."
+    : hasFauxtos
       ? "We haven't spotted you yet—showing recent booth Fauxtos."
-      : "Only the Fauxtos you're in appear below."
-    : "Everyone's composites appear here for now.";
+      : "We'll drop your Fauxtos here the second they're rendered.";
 
   useEffect(() => {
     const ensured = ensureUserIdCookie();
@@ -125,9 +176,20 @@ export function BoothPhonePage({ slug, navigate: _navigate }: BoothPhonePageProp
   }, []);
 
   useEffect(() => {
+    setMyFauxtos([]);
+  }, [slug]);
+
+  useEffect(() => {
     if (typeof document === "undefined") return;
     document.title = `Fauxto Booth${displayName ? ` · ${displayName}` : ""}`;
   }, [displayName]);
+
+  const openFauxto = useCallback(
+    (id: string) => {
+      navigate(`/fauxtos/${encodeURIComponent(id)}`);
+    },
+    [navigate],
+  );
 
   const triggerFilePicker = useCallback(() => {
     fileInputRef.current?.click();
@@ -377,27 +439,35 @@ export function BoothPhonePage({ slug, navigate: _navigate }: BoothPhonePageProp
               {galleryFauxtos.map((fauxto) => {
                 const isExpanded = expandedFauxto === fauxto.filePath;
                 return (
-                  <button
+                  <div
                     key={fauxto.filePath}
-                    type="button"
-                    onClick={() =>
-                      setExpandedFauxto((current) =>
-                        current === fauxto.filePath ? null : fauxto.filePath,
-                      )
-                    }
-                    className={`w-full overflow-hidden rounded-[30px] border border-white/15 bg-slate-950/70 text-left transition ${isExpanded ? "ring-2 ring-cyan-400/70" : ""}`}
+                    className={`overflow-hidden rounded-[30px] border border-white/15 bg-slate-950/70 text-left transition ${isExpanded ? "ring-2 ring-cyan-400/70" : ""}`}
                   >
-                    <img
-                      src={`/api/images/${fauxto.filePath}`}
-                      alt={`Generated Fauxto for ${displayName}`}
-                      className={`w-full object-cover ${isExpanded ? "h-64" : "h-40"}`}
-                    />
-                    {Array.isArray(fauxto.members) && fauxto.members.length > 0 && (
-                      <p className="px-4 py-3 text-xs text-slate-400">
-                        Includes {fauxto.members.length} guest{fauxto.members.length === 1 ? "" : "s"}
-                      </p>
-                    )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedFauxto((current) =>
+                          current === fauxto.filePath ? null : fauxto.filePath,
+                        )
+                      }
+                      className="block w-full"
+                    >
+                      <img
+                        src={`/api/images/${fauxto.filePath}`}
+                        alt={`Generated Fauxto for ${displayName}`}
+                        className={`w-full object-cover ${isExpanded ? "h-64" : "h-40"}`}
+                      />
+                    </button>
+                    <div className="flex items-center justify-end px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => openFauxto(fauxto.fauxtoId)}
+                        className="text-xs font-semibold text-cyan-300 hover:text-cyan-200"
+                      >
+                        View Fauxto →
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
