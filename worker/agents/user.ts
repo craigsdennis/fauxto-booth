@@ -19,7 +19,6 @@ export class UserAgent extends Agent<Env, UserState> {
     fauxtos: [],
   };
 
-  // TODO: is name available here
   onStart() {
     if (!this.state.userId) {
       this.setState({

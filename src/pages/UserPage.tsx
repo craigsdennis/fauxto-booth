@@ -33,7 +33,6 @@ export function UserPage({ navigate }: UserPageProps) {
   useAgent<UserAgent, UserState>({
     agent: "user-agent",
     name: userId ?? "",
-    enabled: Boolean(userId),
     onStateUpdate(state) {
       setFauxtos(state.fauxtos ?? []);
     },
