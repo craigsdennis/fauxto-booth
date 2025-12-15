@@ -123,7 +123,18 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan-300/80">Fauxto</p>
               <h1 className="mt-2 text-3xl font-semibold text-white">
-                A photo from {boothDisplayName ?? parentBoothName ?? "this booth"}
+                A photo from{" "}
+                {parentBoothName ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(boothPath)}
+                    className="text-cyan-300 underline-offset-2 hover:text-cyan-200 hover:underline"
+                  >
+                    {boothDisplayName ?? parentBoothName}
+                  </button>
+                ) : (
+                  <span>{boothDisplayName ?? "this booth"}</span>
+                )}
               </h1>
               {parentBoothName && (
                 <button

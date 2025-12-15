@@ -72,8 +72,6 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   const backgroundUrl = backgroundFilePath
     ? `/api/images/${backgroundFilePath}`
     : null;
-  const inviteMessage = `Come take a fake photo with me at ${phoneUrl} and we'll be added to ${displayName}`;
-  const smsInviteLink = `sms:&body=${encodeURIComponent(inviteMessage)}`;
 
   useEffect(() => {
     if (typeof document === "undefined") return;

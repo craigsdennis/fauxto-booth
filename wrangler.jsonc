@@ -37,6 +37,10 @@
 				"class_name": "FauxtoAgent",
 				"name": "FauxtoAgent",
 			},
+			{
+				"class_name": "UserAgent",
+				"name": "UserAgent",
+			},
 		],
 	},
 	"migrations": [
@@ -45,7 +49,8 @@
 			"new_sqlite_classes": [
 				"HubAgent",
 				"BoothAgent",
-				"FauxtoAgent"
+				"FauxtoAgent",
+				"UserAgent"
 			],
 		},
 	],

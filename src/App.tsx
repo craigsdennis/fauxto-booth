@@ -4,12 +4,14 @@ import { HomePage } from "./pages/HomePage";
 import { BoothPage } from "./pages/BoothPage";
 import { BoothPhonePage } from "./pages/BoothPhonePage";
 import { FauxtoPage } from "./pages/FauxtoPage";
+import { UserPage } from "./pages/UserPage";
 
 type Route =
   | { type: "home" }
   | { type: "booth"; slug: string }
   | { type: "booth-phone"; slug: string }
-  | { type: "fauxto"; fauxtoId: string };
+  | { type: "fauxto"; fauxtoId: string }
+  | { type: "me" };
 
 function normalizePath(path: string) {
   if (!path) return "/";
@@ -37,6 +39,9 @@ function parseRoute(path: string): Route {
     const fauxtoId = decodeURIComponent(segments[1] ?? "");
     if (!fauxtoId) return { type: "home" };
     return { type: "fauxto", fauxtoId };
+  }
+  if (segments[0] === "me") {
+    return { type: "me" };
   }
   return { type: "home" };
 }
@@ -79,6 +84,10 @@ function App() {
 
   if (route.type === "fauxto") {
     return <FauxtoPage fauxtoId={route.fauxtoId} navigate={navigate} />;
+  }
+
+  if (route.type === "me") {
+    return <UserPage navigate={navigate} />;
   }
 
   return <HomePage navigate={navigate} />;

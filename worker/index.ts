@@ -3,12 +3,13 @@ import { getAgentByName } from "agents";
 import { BoothAgent } from "./agents/booth";
 import { HubAgent } from "./agents/hub";
 import { FauxtoAgent } from "./agents/fauxto";
+import { UserAgent } from "./agents/user";
 import { Backgrounder } from "./workflows/backgrounder";
 import { Fauxtographer } from "./workflows/fauxtographer";
 import { agentsMiddleware } from "hono-agents";
 import { getCookie, setCookie } from "hono/cookie";
 
-export { BoothAgent, HubAgent, FauxtoAgent, Backgrounder, Fauxtographer };
+export { BoothAgent, HubAgent, FauxtoAgent, UserAgent, Backgrounder, Fauxtographer };
 
 export type Vars = {
   userId: string;
@@ -18,7 +19,8 @@ const app = new Hono<{ Bindings: Env; Variables: Vars }>();
 
 app.use(async (c, next) => {
   const path = c.req.path;
-  if (path.startsWith("/api/images/")) {
+  // API calls to get the image or the OG pages don't need userIds
+  if (path.startsWith("/api/images/") || path.startsWith("/share/")) {
     return await next();
   }
   let userId = getCookie(c, "userId");
@@ -71,15 +73,21 @@ app.get('/share/fauxtos/:id', async (c) => {
     }
     const description = imageUrl ? `Come take a fake photo with me.` : 'Stay tuned for the finished Fauxto.';
     const twitterCard = imageUrl ? 'summary_large_image' : 'summary';
+    const siteName = "Fauxto Booth";
     const html = `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
     <title>${boothTitle}</title>
+    <link rel="canonical" href="${canonical}" />
+    <meta name="description" content="${description}" />
     <meta property="og:title" content="${boothTitle}" />
     <meta property="og:description" content="${description}" />
     <meta property="og:url" content="${canonical}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="${siteName}" />
     ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
+    ${imageUrl ? `<meta property="og:image:alt" content="${description}" />` : ''}
     <meta name="twitter:title" content="${boothTitle}" />
     <meta name="twitter:description" content="${description}" />
     ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}

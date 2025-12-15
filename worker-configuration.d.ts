@@ -4,13 +4,14 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./worker/index");
-		durableNamespaces: "HubAgent" | "BoothAgent" | "FauxtoAgent";
+		durableNamespaces: "HubAgent" | "BoothAgent" | "FauxtoAgent" | "UserAgent";
 	}
 	interface Env {
 		REPLICATE_API_TOKEN: string;
 		HubAgent: DurableObjectNamespace<import("./worker/index").HubAgent>;
 		BoothAgent: DurableObjectNamespace<import("./worker/index").BoothAgent>;
 		FauxtoAgent: DurableObjectNamespace<import("./worker/index").FauxtoAgent>;
+		UserAgent: DurableObjectNamespace<import("./worker/index").UserAgent>;
 		Photos: R2Bucket;
 		Backgrounder: Workflow<Parameters<import("./worker/index").Backgrounder['run']>[0]['payload']>;
 		Fauxtographer: Workflow<Parameters<import("./worker/index").Fauxtographer['run']>[0]['payload']>;

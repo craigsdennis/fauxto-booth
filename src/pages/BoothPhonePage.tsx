@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAgent } from "agents/react";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
+import { ensureUserIdCookie } from "../utils/user-id";
 
 type BoothPhonePageProps = {
   slug: string;
@@ -13,19 +14,6 @@ type UploadStatus =
   | { status: "pending" }
   | { status: "success" }
   | { status: "error"; message: string };
-
-type FauxtoSummary = {
-  fauxtoId: string;
-  filePath: string;
-};
-
-type GalleryFauxto = FauxtoSummary;
-
-type FauxtoReadyMessage = {
-  type: "fauxtoReady";
-  fauxtoId: string;
-  filePath: string;
-};
 
 async function canvasToJpegBlob(canvas: HTMLCanvasElement) {
   if (canvas.toBlob) {
@@ -58,60 +46,6 @@ async function canvasToJpegBlob(canvas: HTMLCanvasElement) {
   return new Blob([buffer], { type: "image/jpeg" });
 }
 
-function readCookie(name: string) {
-  if (typeof document === "undefined") return null;
-  const cookies = document.cookie ? document.cookie.split(";") : [];
-  for (const cookie of cookies) {
-    const trimmed = cookie.trim();
-    if (!trimmed) continue;
-    const [rawKey, ...rest] = trimmed.split("=");
-    if (decodeURIComponent(rawKey) !== name) continue;
-    return decodeURIComponent(rest.join("="));
-  }
-  return null;
-}
-
-function ensureUserIdCookie() {
-  if (typeof document === "undefined") return null;
-  const existing = readCookie("userId");
-  if (existing) {
-    return existing;
-  }
-  const uuid =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
-  const expires = new Date(Date.now() + 31536000000).toUTCString();
-  document.cookie = `userId=${encodeURIComponent(uuid)}; path=/; expires=${expires}; SameSite=Lax`;
-  return uuid;
-}
-
-function parseAgentPayload(message: unknown) {
-  if (typeof message === "string") {
-    try {
-      return JSON.parse(message);
-    } catch {
-      return null;
-    }
-  }
-  if (typeof message === "object" && message !== null) {
-    if ("data" in message) {
-      const event = message as MessageEvent;
-      const { data } = event;
-      if (typeof data === "string") {
-        try {
-          return JSON.parse(data);
-        } catch {
-          return null;
-        }
-      }
-      return data;
-    }
-    return message;
-  }
-  return null;
-}
-
 const defaultDescription = "Snap a selfie and we'll make it look like you're on set.";
 
 function createAbsoluteUrl(path: string) {
@@ -133,11 +67,8 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
   const [lastCapturePreview, setLastCapturePreview] = useState<string | null>(null);
   const autoStartAttemptedRef = useRef(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [expandedFauxto, setExpandedFauxto] = useState<string | null>(null);
-  const [myFauxtos, setMyFauxtos] = useState<FauxtoSummary[]>([]);
   const [displayName, setDisplayName] = useState(slug);
   const [description, setDescription] = useState(defaultDescription);
-  const [latestFauxtos, setLatestFauxtos] = useState<BoothState["latestFauxtos"]>([]);
 
   useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
@@ -145,34 +76,10 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
     onStateUpdate(state) {
       setDisplayName(state.displayName || slug);
       setDescription(state.description ?? defaultDescription);
-      setLatestFauxtos(state.latestFauxtos ?? []);
-    },
-    onMessage(message) {
-      const payload = parseAgentPayload(message) as Partial<FauxtoReadyMessage> | null;
-      if (
-        payload?.type === "fauxtoReady" &&
-        typeof payload.filePath === "string" &&
-        typeof payload.fauxtoId === "string"
-      ) {
-        setMyFauxtos((current) => {
-          if (current.some((item) => item.fauxtoId === payload.fauxtoId)) {
-            return current;
-          }
-          return [{ fauxtoId: payload.fauxtoId, filePath: payload.filePath }, ...current].slice(0, 20);
-        });
-      }
     },
   });
 
   const uploadEndpoint = `/agents/booth-agent/${encodeURIComponent(slug)}`;
-  const hasPersonalFauxtos = myFauxtos.length > 0;
-  const galleryFauxtos: GalleryFauxto[] = hasPersonalFauxtos ? myFauxtos : latestFauxtos;
-  const hasFauxtos = galleryFauxtos.length > 0;
-  const fauxtoHelperText = hasPersonalFauxtos
-    ? "Only the Fauxtos you're in appear below."
-    : hasFauxtos
-      ? "We haven't spotted you yet—showing recent booth Fauxtos."
-      : "We'll drop your Fauxtos here the second they're rendered.";
   const phonePageUrl =
     typeof window !== "undefined"
       ? window.location.href
@@ -188,20 +95,9 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
   }, []);
 
   useEffect(() => {
-    setMyFauxtos([]);
-  }, [slug]);
-
-  useEffect(() => {
     if (typeof document === "undefined") return;
     document.title = `Fauxto Booth${displayName ? ` · ${displayName}` : ""}`;
   }, [displayName]);
-
-  const openFauxto = useCallback(
-    (id: string) => {
-      navigate(`/fauxtos/${encodeURIComponent(id)}`);
-    },
-    [navigate],
-  );
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -224,7 +120,7 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
   }, [stopCamera]);
 
   const startCamera = useCallback(
-    async (options?: { silentFallback?: boolean }) => {
+    async () => {
       const canUseCamera = typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
 
       if (!canUseCamera) {
@@ -262,7 +158,7 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
       return;
     }
     autoStartAttemptedRef.current = true;
-    void startCamera({ silentFallback: true });
+    void startCamera();
   }, [supportsCamera, cameraActive, startCamera]);
 
   async function uploadSelfie(file: Blob | File, filename?: string) {
@@ -287,6 +183,9 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
       }
 
       setUploadStatus({ status: "success" });
+      window.setTimeout(() => {
+        navigate("/me");
+      }, 3000);
     } catch (error) {
       setUploadStatus({
         status: "error",
@@ -400,7 +299,9 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
             {uploadStatus.status === "idle" && <p className="mt-1">Ready for your close-up.</p>}
             {uploadStatus.status === "pending" && <p className="mt-1">Uploading… this can take a few seconds.</p>}
             {uploadStatus.status === "success" && (
-              <p className="mt-1 text-emerald-300">Got it! We'll ping the host as soon as your composite is ready.</p>
+              <p className="mt-1 text-emerald-300">
+                Selfie uploaded successfully—wow you look great! Sending you to your Fauxtos page; you&rsquo;ll see every masterpiece you&rsquo;re part of there.
+              </p>
             )}
             {uploadStatus.status === "error" && (
               <p className="mt-1 text-rose-300">{uploadStatus.message}</p>
@@ -409,58 +310,6 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
           <p className="text-center text-xs text-slate-500">
             All photos are captured right here—no file uploads needed.
           </p>
-        </section>
-
-        <section className="mt-6 rounded-[32px] border border-white/10 bg-slate-900/70 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold">Your Fauxtos</h2>
-              <p className="text-xs text-slate-400">{fauxtoHelperText}</p>
-            </div>
-            {hasFauxtos && <span className="text-xs font-medium text-slate-300">{galleryFauxtos.length}</span>}
-          </div>
-          {hasFauxtos ? (
-            <div className="mt-4 space-y-4">
-              {galleryFauxtos.map((fauxto) => {
-                const isExpanded = expandedFauxto === fauxto.filePath;
-                return (
-                  <div
-                    key={fauxto.filePath}
-                    className={`overflow-hidden rounded-[30px] border border-white/15 bg-slate-950/70 text-left transition ${isExpanded ? "ring-2 ring-cyan-400/70" : ""}`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedFauxto((current) =>
-                          current === fauxto.filePath ? null : fauxto.filePath,
-                        )
-                      }
-                      className="block w-full"
-                    >
-                      <img
-                        src={`/api/images/${fauxto.filePath}`}
-                        alt={`Generated Fauxto for ${displayName}`}
-                        className={`w-full object-cover ${isExpanded ? "h-64" : "h-40"}`}
-                      />
-                    </button>
-                    <div className="flex items-center justify-end px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => openFauxto(fauxto.fauxtoId)}
-                        className="text-xs font-semibold text-cyan-300 hover:text-cyan-200"
-                      >
-                        View Fauxto →
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-slate-400">
-              We'll drop your Fauxtos here the second we spot you in a finished render.
-            </p>
-          )}
         </section>
 
       </div>

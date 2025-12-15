@@ -235,7 +235,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
     this.sql`UPDATE fauxtos SET filePath=${filePath} WHERE id=${fauxtoId}`;
     const rows = this.sql<{
       memberUserId: string;
-    }>`SELECT memberUserId FROM fauxto_members WHERE id = ${fauxtoId}`;
+    }>`SELECT memberUserId FROM fauxto_members WHERE fauxtoId = ${fauxtoId}`;
     const members = rows.map((r) => r.memberUserId);
     const fauxtoAgent = await getAgentByName(this.env.FauxtoAgent, fauxtoId);
     await fauxtoAgent.setup({ filePath, members, parentBoothName: this.name });
@@ -263,6 +263,26 @@ export class BoothAgent extends Agent<Env, BoothState> {
       latestFauxtos: latestFauxtos.slice(0, 20),
     });
 
+    if (members.length > 0) {
+      const boothDisplayName = this.state.displayName || this.name;
+      const createdAt = new Date().toISOString();
+      await Promise.all(
+        members.map(async (memberId) => {
+          try {
+            const userAgent = await getAgentByName(this.env.UserAgent, memberId);
+            await userAgent.addFauxto({
+              fauxtoId,
+              filePath,
+              boothName: this.name,
+              boothDisplayName,
+              createdAt,
+            });
+          } catch (error) {
+            console.warn("Failed to update user agent", { memberId, error });
+          }
+        }),
+      );
+    }
   }
 
   // Reserves the current fauxto members
