@@ -13,6 +13,14 @@ export type FauxtoDetail = {
   filePath: string;
 };
 
+export type BoothFauxtoRecord = {
+  boothName: string;
+  boothDisplayName: string;
+  fauxtoId: string;
+  filePath: string | null;
+  createdAt: string;
+};
+
 export type BoothState = {
   displayName: string;
   description: string;
@@ -315,7 +323,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
     const input = {
       size: "4K",
       prompt: `Using the backdrop of image_0 and then add all the people from the remaining images to the photo. 
-        Make the outfit and expressions match what might happen in a photobooth that: ${this.state.description}
+        Make the outfit and expressions match what might happen in a photobooth that is described as: ${this.state.description}
         `,
       aspect_ratio: "16:9",
       image_input,
@@ -403,6 +411,23 @@ LIMIT ${limit};
     return results;
   }
 
+  @callable()
+  async listAllFauxtos(): Promise<BoothFauxtoRecord[]> {
+    const rows = this.sql<{
+      id: string;
+      filePath: string | null;
+      createdAt: string;
+    }>`SELECT id, filePath, createdAt FROM fauxtos ORDER BY createdAt DESC;`;
+    const boothDisplayName = this.state.displayName || this.name;
+    return rows.map((row) => ({
+      boothName: this.name,
+      boothDisplayName,
+      fauxtoId: row.id,
+      filePath: row.filePath ?? null,
+      createdAt: row.createdAt,
+    }));
+  }
+
   async onRequest(request: Request): Promise<Response> {
     if (request.method !== "POST") {
       // Right?
@@ -445,6 +470,24 @@ LIMIT ${limit};
           "Upload more selfies, or press the reshoot button to capture more fauxtos",
       });
     }
+  }
+
+  async removeFauxto({ fauxtoId }: { fauxtoId: string }) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    this.sql`DELETE FROM fauxto_members WHERE fauxtoId = ${fauxtoId};`;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    this.sql`DELETE FROM fauxtos WHERE id = ${fauxtoId};`;
+    const latestFauxtos = this.state.latestFauxtos.filter(
+      (fauxto) => fauxto.fauxtoId !== fauxtoId
+    );
+    const [{ total }] =
+      this.sql<{ total: number }>`SELECT COUNT(*) as total FROM fauxtos;`;
+    this.setState({
+      ...this.state,
+      latestFauxtos,
+      fauxtoCount: total,
+    });
+    return true;
   }
 
   @callable()

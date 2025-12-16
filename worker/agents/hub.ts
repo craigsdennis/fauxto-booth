@@ -1,4 +1,5 @@
 import { Agent, callable, getAgentByName } from "agents";
+import type { BoothFauxtoRecord } from "./booth";
 
 export type BoothDetail = {
   name: string;
@@ -7,6 +8,12 @@ export type BoothDetail = {
 
 export type HubState = {
   latestBooths: BoothDetail[];
+};
+
+export type HubFauxtoDetail = {
+  boothName: string;
+  boothDisplayName: string;
+  fauxtos: BoothFauxtoRecord[];
 };
 
 export class HubAgent extends Agent<Env, HubState> {
@@ -75,7 +82,7 @@ export class HubAgent extends Agent<Env, HubState> {
     displayName,
     description,
     hostName,
-    idealMemberSize
+    idealMemberSize,
   }: {
     displayName: string;
     description: string;
@@ -98,5 +105,56 @@ export class HubAgent extends Agent<Env, HubState> {
       latestBooths: latestBooths.slice(0, 10),
     });
     return boothSlug;
+  }
+
+  @callable()
+  async allBoothSlugs(): Promise<string[]> {
+    const rows = this.sql<{
+      slug: string;
+    }>`SELECT slug FROM booths ORDER BY createdAt DESC;`;
+    return rows.map((row) => row.slug);
+  }
+
+  @callable()
+  async allFauxtos(): Promise<HubFauxtoDetail[]> {
+    const slugs = await this.allBoothSlugs();
+    if (slugs.length === 0) {
+      return [];
+    }
+
+    const perBoothRecords = await Promise.all(
+      slugs.map(async (slug) => {
+        try {
+          const booth = await getAgentByName(this.env.BoothAgent, slug);
+          const state = await booth.state;
+          const boothDisplayName = state.displayName || slug;
+          const fauxtos = await booth.listAllFauxtos();
+          return {
+            boothName: slug,
+            boothDisplayName,
+            fauxtos: fauxtos ?? [],
+          };
+        } catch (error) {
+          console.warn(`Failed to fetch fauxtos for booth ${slug}`, error);
+          return {
+            boothName: slug,
+            boothDisplayName: slug,
+            fauxtos: [],
+          };
+        }
+      })
+    );
+
+    return perBoothRecords;
+  }
+
+  @callable()
+  async deleteFauxto({ fauxtoId }: { fauxtoId: string }) {
+    if (!fauxtoId) {
+      throw new Error("A fauxto ID is required.");
+    }
+    const fauxtoAgent = await getAgentByName(this.env.FauxtoAgent, fauxtoId);
+    await fauxtoAgent.delete();
+    return true;
   }
 }

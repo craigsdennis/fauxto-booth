@@ -36,4 +36,15 @@ export class UserAgent extends Agent<Env, UserState> {
       fauxtos: [detail, ...existing],
     });
   }
+
+  removeFauxto(fauxtoId: string) {
+    const remaining = this.state.fauxtos.filter((fauxto) => fauxto.fauxtoId !== fauxtoId);
+    if (remaining.length === this.state.fauxtos.length) {
+      return;
+    }
+    this.setState({
+      ...this.state,
+      fauxtos: remaining,
+    });
+  }
 }

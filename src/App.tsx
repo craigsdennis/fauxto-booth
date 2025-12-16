@@ -5,13 +5,15 @@ import { BoothPage } from "./pages/BoothPage";
 import { BoothPhonePage } from "./pages/BoothPhonePage";
 import { FauxtoPage } from "./pages/FauxtoPage";
 import { UserPage } from "./pages/UserPage";
+import { AdminPage } from "./pages/AdminPage";
 
 type Route =
   | { type: "home" }
   | { type: "booth"; slug: string }
   | { type: "booth-phone"; slug: string }
   | { type: "fauxto"; fauxtoId: string }
-  | { type: "me" };
+  | { type: "me" }
+  | { type: "admin" };
 
 function normalizePath(path: string) {
   if (!path) return "/";
@@ -42,6 +44,9 @@ function parseRoute(path: string): Route {
   }
   if (segments[0] === "me") {
     return { type: "me" };
+  }
+  if (segments[0] === "admin") {
+    return { type: "admin" };
   }
   return { type: "home" };
 }
@@ -88,6 +93,10 @@ function App() {
 
   if (route.type === "me") {
     return <UserPage navigate={navigate} />;
+  }
+
+  if (route.type === "admin") {
+    return <AdminPage navigate={navigate} />;
   }
 
   return <HomePage navigate={navigate} />;
