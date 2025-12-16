@@ -35,6 +35,8 @@ export function AdminPage({ navigate }: AdminPageProps) {
   const [fauxtoError, setFauxtoError] = useState<string | null>(null);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingBoothDeletes, setPendingBoothDeletes] = useState<Record<string, boolean>>({});
+  const [boothDeleteError, setBoothDeleteError] = useState<string | null>(null);
 
   const agent = useAgent<HubAgent, HubState>({
     agent: "hub-agent",
@@ -142,6 +144,37 @@ export function AdminPage({ navigate }: AdminPageProps) {
     [agent],
   );
 
+  const handleDeleteBooth = useCallback(
+    async (slug: string) => {
+      if (!agent?.stub?.deleteBooth) {
+        setBoothDeleteError("Delete action is unavailable right now. Try reloading.");
+        return;
+      }
+      setBoothDeleteError(null);
+      setPendingBoothDeletes((prev) => ({ ...prev, [slug]: true }));
+      try {
+        await agent.stub.deleteBooth({ boothSlug: slug });
+        setBoothSlugs((slugs) => slugs.filter((existing) => existing !== slug));
+        setBoothFauxtos((groups) =>
+          groups.filter((group) => group.boothName !== slug),
+        );
+      } catch (err) {
+        setBoothDeleteError(
+          err instanceof Error
+            ? err.message
+            : "We couldn't delete that booth. Try again.",
+        );
+      } finally {
+        setPendingBoothDeletes((prev) => {
+          const next = { ...prev };
+          delete next[slug];
+          return next;
+        });
+      }
+    },
+    [agent],
+  );
+
   const sortedSlugs = useMemo(() => {
     return [...boothSlugs].sort();
   }, [boothSlugs]);
@@ -199,6 +232,9 @@ export function AdminPage({ navigate }: AdminPageProps) {
                 </button>
               </div>
             </div>
+            {boothDeleteError && (
+              <p className="mt-4 text-sm text-rose-300">{boothDeleteError}</p>
+            )}
             {loading && (
               <p className="mt-6 text-sm text-slate-400">Loading booths…</p>
             )}
@@ -209,18 +245,35 @@ export function AdminPage({ navigate }: AdminPageProps) {
               <>
                 {hasSlugs ? (
                   <ul className="mt-6 divide-y divide-white/10 rounded-3xl border border-white/10 bg-slate-950/40 text-sm text-white">
-                    {sortedSlugs.map((slug) => (
-                      <li key={slug}>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/booths/${encodeURIComponent(slug)}`)}
-                          className="flex w-full items-center justify-between px-5 py-3 text-left transition hover:bg-white/5"
+                    {sortedSlugs.map((slug) => {
+                      const isDeleting = Boolean(pendingBoothDeletes[slug]);
+                      return (
+                        <li
+                          key={slug}
+                          className="flex flex-wrap items-center gap-3 px-5 py-3 transition hover:bg-white/5"
                         >
                           <span className="font-mono text-sm">{slug}</span>
-                          <span className="text-xs uppercase tracking-[0.3em] text-cyan-200">Open</span>
-                        </button>
-                      </li>
-                    ))}
+                          <div className="ml-auto flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em]">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/booths/${encodeURIComponent(slug)}`)}
+                              className="rounded-2xl border border-white/20 px-3 py-1 text-cyan-200 transition hover:border-white/40 disabled:opacity-50"
+                              disabled={isDeleting}
+                            >
+                              Open
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBooth(slug)}
+                              className="rounded-2xl border border-rose-400/40 px-3 py-1 text-rose-300 transition hover:border-rose-300 disabled:opacity-50"
+                              disabled={isDeleting}
+                            >
+                              {isDeleting ? "Deleting…" : "Delete"}
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="mt-6 text-sm text-slate-400">No booths found yet. Spin one up from the lobby.</p>

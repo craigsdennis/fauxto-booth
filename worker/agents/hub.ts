@@ -157,4 +157,22 @@ export class HubAgent extends Agent<Env, HubState> {
     await fauxtoAgent.delete();
     return true;
   }
+
+  @callable()
+  async deleteBooth({ boothSlug }: { boothSlug: string }) {
+    if (!boothSlug) {
+      throw new Error("A booth slug is required.");
+    }
+    const booth = await getAgentByName(this.env.BoothAgent, boothSlug);
+    await booth.delete();
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    this.sql`DELETE FROM booths WHERE slug = ${boothSlug};`;
+    this.setState({
+      ...this.state,
+      latestBooths: this.state.latestBooths.filter(
+        (boothDetail) => boothDetail.name !== boothSlug,
+      ),
+    });
+    return true;
+  }
 }

@@ -142,6 +142,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
       aspect_ratio: "16:9",
     };
     const output = await replicate.run("bytedance/seedream-4.5", { input });
+    // @ts-expect-error - Not the right type currrently
     const url = output[0].url();
     console.log({ url });
     return url.href;
@@ -329,6 +330,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
       image_input,
     };
     const output = await replicate.run("bytedance/seedream-4.5", { input });
+    // @ts-expect-error - Not the right type atm
     const url = output[0].url();
     console.log({ url });
     return url.href;
@@ -500,5 +502,50 @@ LIMIT ${limit};
     // Side effect, run a test to see if we can get folks
     await this.snapFauxto({ reshoot: false });
     return size;
+  }
+
+  @callable()
+  async delete() {
+    const fauxtoRows = this.sql<{ id: string }>`SELECT id FROM fauxtos;`;
+    for (const { id } of fauxtoRows) {
+      try {
+        const fauxto = await getAgentByName(this.env.FauxtoAgent, id);
+        await fauxto.delete();
+      } catch (error) {
+        console.warn(
+          `Failed to delete fauxto ${id} while deleting booth ${this.name}`,
+          error
+        );
+      }
+    }
+
+    const uploadRows = this.sql<{ filePath: string }>`SELECT filePath FROM uploads;`;
+    await Promise.all(
+      uploadRows.map(async ({ filePath }) => {
+        try {
+          await this.env.Photos.delete(filePath);
+        } catch (error) {
+          console.warn(
+            `Failed to delete upload ${filePath} while deleting booth ${this.name}`,
+            error
+          );
+        }
+      })
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    this.sql`DELETE FROM uploads;`;
+
+    if (this.state.backgroundFilePath) {
+      try {
+        await this.env.Photos.delete(this.state.backgroundFilePath);
+      } catch (error) {
+        console.warn(
+          `Failed to delete background ${this.state.backgroundFilePath} for booth ${this.name}`,
+          error
+        );
+      }
+    }
+
+    return this.destroy();
   }
 }
