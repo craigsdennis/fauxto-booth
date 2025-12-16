@@ -93,7 +93,6 @@ export class HubAgent extends Agent<Env, HubState> {
     const booth = await getAgentByName(this.env.BoothAgent, boothSlug);
     // Save the booth
     await booth.setup({ displayName, description, hostName, idealMemberSize });
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this
       .sql`INSERT INTO booths (slug, displayName) VALUES (${boothSlug}, ${displayName});`;
     // Prepend the state
@@ -165,7 +164,6 @@ export class HubAgent extends Agent<Env, HubState> {
     }
     const booth = await getAgentByName(this.env.BoothAgent, boothSlug);
     await booth.delete();
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this.sql`DELETE FROM booths WHERE slug = ${boothSlug};`;
     this.setState({
       ...this.state,

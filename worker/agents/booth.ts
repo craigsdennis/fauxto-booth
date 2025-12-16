@@ -222,7 +222,6 @@ export class BoothAgent extends Agent<Env, BoothState> {
     fauxtoId: string;
     filePath: string;
   }) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this.sql`UPDATE fauxtos SET filePath=${filePath} WHERE id=${fauxtoId}`;
     const rows = this.sql<{
       memberUserId: string;
@@ -281,11 +280,9 @@ export class BoothAgent extends Agent<Env, BoothState> {
       limit: this.state.idealMemberSize,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this
       .sql`INSERT INTO fauxtos (id, workflowInstanceId) VALUES (${fauxtoId}, ${workflowInstanceId})`;
     for (const upload of uploads) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       this
         .sql`INSERT INTO fauxto_members (fauxtoId, uploadId, memberUserId) VALUES (${fauxtoId}, ${upload.id}, ${upload.postedByUserId})`;
     }
@@ -445,7 +442,6 @@ LIMIT ${limit};
     await this.env.Photos.put(uploadFileName, file.stream(), {
       httpMetadata: { contentType: file.type },
     });
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this
       .sql`INSERT INTO uploads (postedByUserId, filePath) VALUES (${userId}, ${uploadFileName});`;
     this.setState({
@@ -475,9 +471,7 @@ LIMIT ${limit};
   }
 
   async removeFauxto({ fauxtoId }: { fauxtoId: string }) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this.sql`DELETE FROM fauxto_members WHERE fauxtoId = ${fauxtoId};`;
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this.sql`DELETE FROM fauxtos WHERE id = ${fauxtoId};`;
     const latestFauxtos = this.state.latestFauxtos.filter(
       (fauxto) => fauxto.fauxtoId !== fauxtoId
@@ -532,7 +526,6 @@ LIMIT ${limit};
         }
       })
     );
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     this.sql`DELETE FROM uploads;`;
 
     if (this.state.backgroundFilePath) {

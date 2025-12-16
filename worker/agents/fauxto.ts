@@ -61,14 +61,7 @@ export class FauxtoAgent extends Agent<Env, FauxtoState> {
         );
       }
     }
-
-    this.setState({
-      ...this.state,
-      filePath: "",
-      members: [],
-      parentBoothName: "",
-    });
-
-    return true;
+    // Will thow an error, it's okay
+    return this.destroy();
   }
 }

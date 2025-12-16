@@ -357,21 +357,22 @@ export function AdminPage({ navigate }: AdminPageProps) {
                                         </p>
                                       </div>
                                     </div>
-                                    <div className="ml-auto flex items-center gap-2">
+                                    <div className="ml-auto flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em]">
                                       <button
                                         type="button"
-                                        className="text-xs font-semibold text-cyan-300 transition hover:text-cyan-200"
+                                        className="rounded-2xl border border-white/20 px-3 py-1 text-cyan-200 transition hover:border-white/40 disabled:opacity-50"
+                                        disabled={isDeleting}
                                         onClick={() =>
                                           navigate(
                                             `/fauxtos/${encodeURIComponent(fauxto.fauxtoId)}`,
                                           )
                                         }
                                       >
-                                        Open →
+                                        Open
                                       </button>
                                       <button
                                         type="button"
-                                        className="text-xs font-semibold text-rose-300 transition hover:text-rose-200 disabled:opacity-50"
+                                        className="rounded-2xl border border-rose-400/40 px-3 py-1 text-rose-300 transition hover:border-rose-300 disabled:opacity-50"
                                         disabled={isDeleting}
                                         onClick={() =>
                                           handleDeleteFauxto(
