@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import * as QRCode from "qrcode";
 import { useAgent } from "agents/react";
-import type { BoothAgent, BoothState } from "../../worker/agents/booth";
+import type { BoothAgent, BoothState, FauxtoDetail } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
 import { FooterBadge } from "../partials/FooterBadge";
 
@@ -36,6 +36,7 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   const [idealMemberSizeError, setIdealMemberSizeError] = useState<string | null>(null);
   const [idealMemberSizeUpdating, setIdealMemberSizeUpdating] = useState(false);
   const [inProgressFauxtoCount, setInProgressFauxtoCount] = useState(0);
+  const [fullscreenFauxto, setFullscreenFauxto] = useState<FauxtoDetail | null>(null);
 
   const agent = useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
@@ -202,6 +203,25 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
     };
   }, [hasFauxtos, latestFauxtoCount]);
 
+  useEffect(() => {
+    if (!fullscreenFauxto) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setFullscreenFauxto(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullscreenFauxto]);
+
+  useEffect(() => {
+    if (!fullscreenFauxto) return;
+    const stillExists = latestFauxtos.some((fauxto) => fauxto.fauxtoId === fullscreenFauxto.fauxtoId);
+    if (!stillExists) {
+      setFullscreenFauxto(null);
+    }
+  }, [fullscreenFauxto, latestFauxtos]);
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
       <div className="relative isolate flex-1 overflow-hidden pb-32">
@@ -297,6 +317,13 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
               {qrCodeError && (
                 <p className="mt-3 text-xs text-rose-200">{qrCodeError}</p>
               )}
+              <button
+                type="button"
+                onClick={() => navigate(phonePath)}
+                className="mt-4 inline-flex items-center justify-center text-xs font-semibold text-cyan-300 transition hover:text-cyan-200"
+              >
+                📸 Add your selfie
+              </button>
             </div>
           </div>
 
@@ -366,28 +393,39 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
               )}
             </div>
             {activeFauxto && (
-              <div className="mt-5 overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/70 shadow-xl shadow-black/40">
-                <button
-                  type="button"
-                  onClick={() => openFauxto(activeFauxto.fauxtoId)}
-                  className="group block w-full"
-                >
-                  <img
-                    key={activeFauxto.filePath}
-                    src={`/api/images/${activeFauxto.filePath}`}
-                    alt={`Featured Fauxto for ${displayName}`}
-                    className="h-80 w-full object-cover transition-all duration-700 group-hover:opacity-90"
-                  />
-                </button>
-                <div className="flex items-center justify-between px-6 py-4 text-xs text-slate-400">
-                  <span>Slideshow · {activeFauxtoIndex + 1} / {latestFauxtoCount}</span>
+              <div className="mt-5 rounded-[32px] border border-white/10 bg-slate-900/70 shadow-xl shadow-black/40">
+                <div className="relative aspect-[16/9] w-full overflow-hidden">
                   <button
                     type="button"
                     onClick={() => openFauxto(activeFauxto.fauxtoId)}
-                    className="text-cyan-300 hover:text-cyan-200"
+                    className="group block h-full w-full"
                   >
-                    Open Fauxto →
+                    <img
+                      key={activeFauxto.filePath}
+                      src={`/api/images/${activeFauxto.filePath}`}
+                      alt={`Featured Fauxto for ${displayName}`}
+                      className="h-full w-full object-cover transition-all duration-700 group-hover:opacity-90"
+                    />
                   </button>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 text-xs text-slate-400">
+                  <span>Slideshow · {activeFauxtoIndex + 1} / {latestFauxtoCount}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openFauxto(activeFauxto.fauxtoId)}
+                      className="text-cyan-300 transition hover:text-cyan-200"
+                    >
+                      Open Fauxto →
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFullscreenFauxto(activeFauxto)}
+                      className="rounded-full border border-white/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-white transition hover:border-white/40"
+                    >
+                      Fullscreen
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -416,6 +454,49 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
 
         <FooterBadge className="mx-auto mt-12 w-full max-w-5xl" />
       </div>
+
+      {fullscreenFauxto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-4 py-8"
+          onClick={() => setFullscreenFauxto(null)}
+        >
+          <div
+            className="max-w-6xl flex-1 rounded-[32px] border border-white/20 bg-slate-900/80 p-4 shadow-2xl shadow-black/60"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 text-xs text-slate-300">
+              <span className="uppercase tracking-[0.3em] text-cyan-200">Fullscreen Fauxto</span>
+              <button
+                type="button"
+                onClick={() => setFullscreenFauxto(null)}
+                className="rounded-full border border-white/30 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-white transition hover:border-white/60"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-4 flex items-center justify-center">
+              <img
+                src={`/api/images/${fullscreenFauxto.filePath}`}
+                alt={`Fullscreen Fauxto for ${displayName}`}
+                className="max-h-[80vh] w-auto max-w-full rounded-[28px] border border-white/10 object-contain"
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
+              <p className="font-semibold text-white">{displayName}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  openFauxto(fullscreenFauxto.fauxtoId);
+                  setFullscreenFauxto(null);
+                }}
+                className="text-cyan-300 transition hover:text-cyan-200"
+              >
+                Open Fauxto →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

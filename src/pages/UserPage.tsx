@@ -23,16 +23,19 @@ function formatTimestamp(value: string) {
 }
 
 export function UserPage({ navigate }: UserPageProps) {
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(() => ensureUserIdCookie());
   const [fauxtos, setFauxtos] = useState<UserState["fauxtos"]>([]);
 
   useEffect(() => {
-    setUserId(ensureUserIdCookie());
-  }, []);
+    if (!userId) {
+      setUserId(ensureUserIdCookie());
+    }
+  }, [userId]);
 
   useAgent<UserAgent, UserState>({
     agent: "user-agent",
     name: userId ?? "",
+    enabled: Boolean(userId),
     onStateUpdate(state) {
       setFauxtos(state.fauxtos ?? []);
     },

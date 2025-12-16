@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAgent } from "agents/react";
 import type { FauxtoAgent, FauxtoState } from "../../worker/agents/fauxto";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
@@ -49,29 +49,37 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
   const sharePath = `/share/fauxtos/${encodeURIComponent(fauxtoId)}`;
   const shareUrl = createAbsoluteUrl(sharePath);
   const shareMessage = `Come take a fake photo with me at ${shareUrl}`;
+  const smsLink = useMemo(() => {
+    if (typeof encodeURIComponent === "undefined") return `sms:?body=${shareMessage}`;
+    return `sms:?body=${encodeURIComponent(shareMessage)}`;
+  }, [shareMessage]);
+  const copyShareLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch (error) {
+      console.warn("Copy failed, falling back to prompt", error);
+      window.prompt?.("Copy this link", shareUrl);
+    }
+  }, [shareUrl]);
   const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareMessage)}`;
 
   const handleWebShare = useCallback(async () => {
-    if (typeof navigator === "undefined" || !navigator.share) {
+    if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.clipboard?.writeText(shareMessage);
+        await navigator.share({
+          title: boothDisplayName ?? parentBoothName ?? "Fauxto Booth",
+          text: shareMessage,
+          url: shareUrl,
+        });
+        return;
       } catch (error) {
-        console.warn("Could not copy share message", error);
-      }
-      return;
-    }
-    try {
-      await navigator.share({
-        title: boothDisplayName ?? parentBoothName ?? "Fauxto Booth",
-        text: shareMessage,
-        url: shareUrl,
-      });
-    } catch (error) {
-      if ((error as Error).name !== "AbortError") {
-        console.warn("Share failed", error);
+        if ((error as Error).name !== "AbortError") {
+          console.warn("Share failed", error);
+        }
       }
     }
-  }, [boothDisplayName, parentBoothName, shareMessage, shareUrl]);
+    await copyShareLink();
+  }, [boothDisplayName, parentBoothName, copyShareLink, shareMessage, shareUrl]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -151,16 +159,42 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
               <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
+                  onClick={copyShareLink}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40"
+                >
+                  <span>Copy link</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                    className="h-3.5 w-3.5"
+                  >
+                    <path d="M15 3h6v6" />
+                    <path d="M9 21H3v-6" />
+                    <path d="M21 3l-7 7" />
+                    <path d="M3 21l7-7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
                   onClick={handleWebShare}
-                  className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white"
+                  className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40"
                 >
                   Share
                 </button>
                 <a
+                  href={smsLink}
+                  className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40"
+                >
+                  Text invite
+                </a>
+                <a
                   href={twitterShareUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white"
+                  className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40"
                 >
                   Post to X
                 </a>

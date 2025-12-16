@@ -10,4 +10,7 @@ export default defineConfig({
   esbuild: {
     target: "es2022",
   },
+  server: {
+    allowedHosts: ["valuable-developed-sum-pace.trycloudflare.com"]
+  }
 });

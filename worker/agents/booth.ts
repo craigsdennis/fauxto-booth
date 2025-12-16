@@ -1,10 +1,4 @@
-import {
-  Agent,
-  callable,
-  getAgentByName,
-  type Connection,
-  type ConnectionContext,
-} from "agents";
+import { Agent, callable, getAgentByName } from "agents";
 import { env } from "cloudflare:workers";
 import Replicate from "replicate";
 
@@ -15,9 +9,9 @@ type Upload = {
 };
 
 export type FauxtoDetail = {
-  fauxtoId: string,
-  filePath: string,
-}
+  fauxtoId: string;
+  filePath: string;
+};
 
 export type BoothState = {
   displayName: string;
@@ -42,7 +36,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
     idealMemberSize: 2,
     fauxtoCount: 0,
     inProgressFauxtoCount: 0,
-    latestFauxtos: []
+    latestFauxtos: [],
   };
 
   onStart() {
@@ -145,21 +139,6 @@ export class BoothAgent extends Agent<Env, BoothState> {
     return url.href;
   }
 
-  getConnectionTags(
-    _connection: Connection,
-    context: ConnectionContext
-  ): string[] | Promise<string[]> {
-    const cookie = context.request.headers.get("Cookie");
-    if (!cookie) return [];
-
-    // Extract a specific cookie
-    const cookies = Object.fromEntries(
-      cookie.split(";").map((c) => c.trim().split("="))
-    );
-
-    return [cookies.userId];
-  }
-
   updateDisplayStatus({ displayStatus }: { displayStatus: string }) {
     this.setState({
       ...this.state,
@@ -200,23 +179,26 @@ export class BoothAgent extends Agent<Env, BoothState> {
         });
         return;
       }
-      if (since < 30000) {
-        console.warn(
-          `Only ${awaiting} awaiting, want ${this.state.idealMemberSize}.`
-        );
-        this.updateDisplayStatus({displayStatus: "Waiting for a few more"});
-        // ...schedule a call in 10 seconds to try again
-        const scheduled = this.getSchedules().some(
-          (s) => s.callback === "snapFauxto"
-        );
-        if (!scheduled) {
-          console.log("Scheduling a retry in 10 seconds");
-          await this.schedule(10, "snapFauxto", { reshoot: false });
+      if (!reshoot) {
+
+        if (since < 30000) {
+          console.warn(
+            `Only ${awaiting} awaiting, want ${this.state.idealMemberSize}.`
+          );
+          this.updateDisplayStatus({ displayStatus: "Waiting for a few more" });
+          // ...schedule a call in 10 seconds to try again
+          const scheduled = this.getSchedules().some(
+            (s) => s.callback === "snapFauxto"
+          );
+          if (!scheduled) {
+            console.log("Scheduling a retry in 10 seconds");
+            await this.schedule(10, "snapFauxto", { reshoot: false });
+          }
+          return;
         }
-        return;
       }
     }
-    this.updateDisplayStatus({displayStatus: `📸 Snapping fauxtos`})
+    this.updateDisplayStatus({ displayStatus: `📸 Snapping fauxtos` });
     await this.env.Fauxtographer.create({
       params: {
         agentName: this.name,
@@ -243,18 +225,8 @@ export class BoothAgent extends Agent<Env, BoothState> {
       ...this.state,
       fauxtoCount: this.state.fauxtoCount + 1,
     });
-    // Broadcast to members of the Fauxto
-    for (const member of members) {
-      for (const conn of this.getConnections(member)) {
-        conn.send(JSON.stringify({
-          type: "fauxtoReady",
-          fauxtoId,
-          filePath
-        }));
-      }
-    }
 
-        // Prepend the state
+    // Prepend the state
     const latestFauxtos = this.state.latestFauxtos;
     latestFauxtos.unshift({ fauxtoId, filePath });
     this.setState({
@@ -269,7 +241,11 @@ export class BoothAgent extends Agent<Env, BoothState> {
       await Promise.all(
         members.map(async (memberId) => {
           try {
-            const userAgent = await getAgentByName(this.env.UserAgent, memberId);
+            console.log(`Getting user with name ${memberId}`);
+            const userAgent = await getAgentByName(
+              this.env.UserAgent,
+              memberId
+            );
             await userAgent.addFauxto({
               fauxtoId,
               filePath,
@@ -280,7 +256,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
           } catch (error) {
             console.warn("Failed to update user agent", { memberId, error });
           }
-        }),
+        })
       );
     }
   }
@@ -455,16 +431,19 @@ LIMIT ${limit};
 
   @callable()
   async reshoot() {
-    return await this.snapFauxto({reshoot: true});
+    return await this.snapFauxto({ reshoot: true });
   }
 
-  changeInProgressFauxtoCount({by}: {by: number}) {
+  changeInProgressFauxtoCount({ by }: { by: number }) {
     this.setState({
       ...this.state,
-      inProgressFauxtoCount: this.state.inProgressFauxtoCount + by
+      inProgressFauxtoCount: this.state.inProgressFauxtoCount + by,
     });
     if (this.state.inProgressFauxtoCount === 0) {
-      this.updateDisplayStatus({displayStatus: "Upload more selfies, or press the reshoot button to capture more fauxtos"})
+      this.updateDisplayStatus({
+        displayStatus:
+          "Upload more selfies, or press the reshoot button to capture more fauxtos",
+      });
     }
   }
 
@@ -476,8 +455,7 @@ LIMIT ${limit};
       idealMemberSize: size,
     });
     // Side effect, run a test to see if we can get folks
-    await this.snapFauxto({reshoot: false});
+    await this.snapFauxto({ reshoot: false });
     return size;
   }
-
 }
