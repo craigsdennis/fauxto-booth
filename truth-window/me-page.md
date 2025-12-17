@@ -87,3 +87,23 @@ No I mean use the history of this session. Check the other documents for formatt
 
 ## What I Delivered
 - Reformatted this file to mirror the existing truth-window style (verbatim request + delivery pairs) and imported all relevant session history per instruction.
+
+## User Request (verbatim)
+Awesome on the /me page can we reuse that logic? I would like to have the ability to educate while people wait there. It might be cool too make it look like something is typing and then completing the sentence. "Your fauxto is being processed. This application is using ByteDance's SeeDream 4.5 on Replicate. It is using the image editing capabilities to add you and others to the photo." Maybe sentence at a time it typesahead, something like that?
+
+## What I Delivered
+- Reused the user-id helper on `/me` and added a “Live update” block that animates those three sentences one character at a time, pause-by-pause, whenever a guest has no Fauxtos yet—giving them context while they wait.
+- The typing card uses a mono font plus a pulsing caret to emulate a terminal, sits above the existing “No Fauxtos yet” guidance, and stops automatically once the full educational copy has rendered.
+
+## User Request (verbatim)
+On the /me page we should be able to see what booths they've uploaded to based on userid right? Can we show them. "Uploaded to Booth 1, Booth2" and link them?
+
+## What I Delivered
+- Extended the `UserAgent` state with a `booths` list, populate it whenever a guest uploads (and when Fauxtos stream in), and surfaced that array under the `/me` hero so visitors see “Uploaded to” chips that deep-link to each booth they’ve joined.
+- Each chip routes back to its booth control room, giving guests a quick way to revisit hosts even before a Fauxto renders.
+
+## Additional User Request (verbatim)
+Let's get that chip in the section below, and remove the visible userid writing
+
+## What I Delivered (update)
+- Removed the “Connected as …” userId text from `/me` and relocated the booth chips into their own card directly under the hero, matching the requested layout while keeping the quick-link functionality intact.

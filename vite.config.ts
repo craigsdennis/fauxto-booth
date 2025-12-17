@@ -11,6 +11,6 @@ export default defineConfig({
     target: "es2022",
   },
   server: {
-    allowedHosts: ["valuable-developed-sum-pace.trycloudflare.com"]
+    allowedHosts: ["fifty-art-oven-reunion.trycloudflare.com"]
   }
 });

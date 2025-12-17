@@ -448,6 +448,19 @@ LIMIT ${limit};
       ...this.state,
       uploadedCount: this.state.uploadedCount + 1,
     });
+    try {
+      const userAgent = await getAgentByName(this.env.UserAgent, userId);
+      await userAgent.addBooth({
+        boothName: this.name,
+        boothDisplayName: this.state.displayName || this.name,
+      });
+    } catch (error) {
+      console.warn("Failed to update user agent with booth upload", {
+        userId,
+        boothName: this.name,
+        error,
+      });
+    }
     await this.snapFauxto({ reshoot: false });
     return Response.json({ success: true, uploadFileName });
   }
@@ -496,6 +509,17 @@ LIMIT ${limit};
     // Side effect, run a test to see if we can get folks
     await this.snapFauxto({ reshoot: false });
     return size;
+  }
+
+  @callable()
+  async hasUserUpload({ userId }: { userId: string }) {
+    if (!userId) {
+      return false;
+    }
+    const rows =
+      this.sql<{ total: number }>`SELECT COUNT(*) as total FROM uploads WHERE postedByUserId = ${userId};`;
+    const total = rows[0]?.total ?? 0;
+    return total > 0;
   }
 
   @callable()

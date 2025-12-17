@@ -4,6 +4,7 @@ import type { FauxtoAgent, FauxtoState } from "../../worker/agents/fauxto";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
 import { FooterBadge } from "../partials/FooterBadge";
+import { getUserIdFromCookie } from "../utils/user-id";
 
 function createAbsoluteUrl(path: string) {
   const normalized = path.startsWith("/") ? path : `/${path}`;
@@ -23,6 +24,9 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
   const [parentBoothName, setParentBoothName] = useState<string | null>(null);
   const [boothDisplayName, setBoothDisplayName] = useState<string | null>(null);
   const [boothFauxtoCount, setBoothFauxtoCount] = useState(0);
+  const [hasUserUpload, setHasUserUpload] = useState<boolean | null>(null);
+  const [checkingUpload, setCheckingUpload] = useState(false);
+  const [userId] = useState(() => getUserIdFromCookie());
 
   useAgent<FauxtoAgent, FauxtoState>({
     agent: "fauxto-agent",
@@ -33,7 +37,7 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
     },
   });
 
-  useAgent<BoothAgent, BoothState>({
+  const boothAgent = useAgent<BoothAgent, BoothState>({
     agent: "booth-agent",
     name: parentBoothName ?? "",
     enabled: Boolean(parentBoothName),
@@ -44,6 +48,7 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
   });
 
   const boothPath = parentBoothName ? `/booths/${encodeURIComponent(parentBoothName)}` : "/";
+  const boothPhonePath = `${boothPath}/phone`;
   const imagePath = filePath ? `/api/images/${filePath}` : null;
   const imageUrl = imagePath ? createAbsoluteUrl(imagePath) : null;
   const sharePath = `/share/fauxtos/${encodeURIComponent(fauxtoId)}`;
@@ -117,6 +122,43 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
       }
     };
   }, [imageUrl]);
+
+  useEffect(() => {
+    if (!boothAgent?.stub?.hasUserUpload || !parentBoothName || !userId) {
+      return;
+    }
+    let active = true;
+    setCheckingUpload(true);
+    boothAgent.stub
+      .hasUserUpload({ userId })
+      .then((result) => {
+        if (active) {
+          setHasUserUpload(Boolean(result));
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setHasUserUpload(false);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setCheckingUpload(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [boothAgent, parentBoothName, userId]);
+
+  const showJoinCta =
+    Boolean(
+      parentBoothName &&
+        boothDisplayName &&
+        userId &&
+        hasUserUpload === false &&
+        !checkingUpload,
+    );
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
@@ -202,6 +244,28 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
               <p className="mt-2 text-[11px] text-slate-500">{shareUrl}</p>
             </div>
           </div>
+          {showJoinCta && (
+            <div className="rounded-3xl border border-cyan-400/40 bg-slate-900/70 px-5 py-4 text-sm text-slate-200 shadow-lg shadow-cyan-500/10">
+              <p className="font-semibold">
+                <a
+                  href={boothPhonePath}
+                  className="text-cyan-200 underline-offset-2 hover:text-cyan-100 hover:underline"
+                >
+                  Join in, add your selfie to {boothDisplayName}
+                </a>
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                or{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate(boothPath)}
+                  className="font-semibold text-cyan-300 underline-offset-2 hover:text-cyan-100 hover:underline"
+                >
+                  visit {boothDisplayName}
+                </button>
+              </p>
+            </div>
+          )}
 
           <div className="overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/60 shadow-2xl shadow-black/40">
             {imageUrl ? (
