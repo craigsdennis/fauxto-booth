@@ -10,6 +10,39 @@ Fauxto Booth is a Cloudflare-native photo kiosk that lets guests snap a selfie, 
 - **Workflows** – Orchestration for background refreshes and Fauxto generation lives under `worker/workflows/`, letting booth agents kick off long running jobs without blocking requests.
 - **Assets** – Guest uploads, background renders, and final Fauxtos are written to the `Photos` R2 bucket via the worker bindings defined in `wrangler.jsonc`.
 
+```mermaid
+flowchart LR
+  subgraph Workers
+    Hub[HubAgent\nworker/agents/hub.ts]
+    Booth[BoothAgent\nworker/agents/booth.ts]
+    Fauxto[FauxtoAgent\nworker/agents/fauxto.ts]
+    User[UserAgent\nworker/agents/user.ts]
+  end
+  subgraph UI
+    Admin[/Admin Page/]
+    BoothPage[/Booth Page/]
+    Phone[/Phone Upload/]
+    FauxtoPage[/Fauxto Page/]
+    MePage[/Me Page/]
+  end
+  subgraph Workflows
+    Backgrounder[Background Workflow]
+    Fauxtographer[Fauxto Workflow]
+  end
+  Admin -->|useAgent| Hub
+  BoothPage -->|useAgent| Booth
+  Phone -->|Uploads\nPOST /api| Booth
+  FauxtoPage -->|useAgent| Fauxto
+  FauxtoPage -->|useAgent| Booth
+  MePage -->|useAgent| User
+  Hub -->|list & delete| Booth
+  Booth -->|create| Fauxto
+  Booth -->|notify| User
+  Fauxto -->|cleanup| Booth
+  Booth -->|kickoff| Backgrounder
+  Booth -->|kickoff| Fauxtographer
+```
+
 ## AI model
 
 Fauxto Booth currently composites images with [ByteDance’s SeeDream 4.5 model on Replicate](https://replicate.com/bytedance/seedream-4.5). The booth agent assembles the booth background plus member uploads and calls Replicate’s `bytedance/seedream-4.5` image editing endpoint to produce the finished Fauxto.
