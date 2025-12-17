@@ -65,14 +65,22 @@ app.get('/share/fauxtos/:id', async (c) => {
     if (parentBoothName) {
       try {
         const boothAgent = await getAgentByName(c.env.BoothAgent, parentBoothName);
-        const displayName = await boothAgent.state.displayName;
+        const boothState = await boothAgent.state;
+        const displayName = boothState.displayName;
         boothTitle = displayName || parentBoothName;
       } catch (error) {
         console.warn('Unable to load booth agent for share view', error);
       }
     }
-    const description = imageUrl ? `Come take a fake photo with me.` : 'Stay tuned for the finished Fauxto.';
+    const description = imageUrl
+      ? `Come take a fake photo with me at ${boothTitle}.`
+      : `${boothTitle} is assembling your Fauxto now—check back soon.`;
+    const imageAlt = imageUrl
+      ? `Generated Fauxto from ${boothTitle}`
+      : `Fauxto Booth placeholder for ${boothTitle}`;
     const twitterCard = imageUrl ? 'summary_large_image' : 'summary';
+    const twitterHandle = c.env.TWITTER_HANDLE ?? '@CloudflareDev';
+    const domain = url.host;
     const siteName = "Fauxto Booth";
     const html = `<!DOCTYPE html>
 <html>
@@ -87,12 +95,20 @@ app.get('/share/fauxtos/:id', async (c) => {
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="${siteName}" />
     ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
-    ${imageUrl ? `<meta property="og:image:alt" content="${description}" />` : ''}
+    ${imageUrl ? `<meta property="og:image:secure_url" content="${imageUrl}" />` : ''}
+    ${imageUrl ? `<meta property="og:image:width" content="1600" />` : ''}
+    ${imageUrl ? `<meta property="og:image:height" content="900" />` : ''}
+    ${imageUrl ? `<meta property="og:image:alt" content="${imageAlt}" />` : ''}
     <meta name="twitter:title" content="${boothTitle}" />
     <meta name="twitter:description" content="${description}" />
-    ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
+    <meta name="twitter:url" content="${canonical}" />
+    <meta name="twitter:site" content="${twitterHandle}" />
+    <meta name="twitter:creator" content="${twitterHandle}" />
+    <meta name="twitter:domain" content="${domain}" />
     <meta name="twitter:card" content="${twitterCard}" />
-    <meta http-equiv="refresh" content="0; url=${canonical}" />
+    ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
+    ${imageUrl ? `<meta name="twitter:image:alt" content="${imageAlt}" />` : ''}
+    <meta http-equiv="refresh" content="2; url=${canonical}" />
   </head>
   <body>
     <p>Redirecting to your Fauxto...</p>
