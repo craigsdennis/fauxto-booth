@@ -106,4 +106,8 @@ All agents are authored with the [Cloudflare Agents SDK](https://developers.clou
 3. Visit `http://localhost:5173/` to spin up a booth, share `/booths/:slug/phone` on your device, and watch Fauxtos appear in `/me`, `/admin`, and `/fauxtos/:id`.
 
 When you’re ready for production, run `npm run build && npm run deploy` and share the generated URLs. Have fun making Fauxtos that never happened!
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE` for details.
  
