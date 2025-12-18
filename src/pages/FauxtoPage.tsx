@@ -53,7 +53,7 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
   const imageUrl = imagePath ? createAbsoluteUrl(imagePath) : null;
   const sharePath = `/share/fauxtos/${encodeURIComponent(fauxtoId)}`;
   const shareUrl = createAbsoluteUrl(sharePath);
-  const shareMessage = `Come take a fake photo with me at ${shareUrl}`;
+  const shareMessage = `Come take a fake photo with me! ${shareUrl}`;
   const smsLink = useMemo(() => {
     if (typeof encodeURIComponent === "undefined") return `sms:?body=${shareMessage}`;
     return `sms:?body=${encodeURIComponent(shareMessage)}`;

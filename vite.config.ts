@@ -11,6 +11,6 @@ export default defineConfig({
     target: "es2022",
   },
   server: {
-    allowedHosts: ["fifty-art-oven-reunion.trycloudflare.com"]
+    allowedHosts: ["joel-looked-political-city.trycloudflare.com"]
   }
 });

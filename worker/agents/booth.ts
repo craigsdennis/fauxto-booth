@@ -144,7 +144,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
     const output = await replicate.run("bytedance/seedream-4.5", { input });
     // @ts-expect-error - Not the right type currrently
     const url = output[0].url();
-    console.log({ url });
+    console.log({ backgroundReplicateUrl: url });
     return url.href;
   }
 
@@ -318,10 +318,11 @@ export class BoothAgent extends Agent<Env, BoothState> {
       ...urls,
     ];
     console.log({ image_input });
+    const [backgroundMarker, ...peopleMarkers] = image_input.map((_, index) => `image_${index}`);
     const input = {
       size: "4K",
-      prompt: `Using the backdrop of image_0 and then add all the people from the remaining images to the photo. 
-        Make the outfit and expressions match what might happen in a photobooth that is described as: ${this.state.description}
+      prompt: `Using the backdrop of ${backgroundMarker} and then add ${peopleMarkers.join(" and ")} to the photo. 
+        Make their outfits and expressions match what might happen in a photobooth that has been described as: ${this.state.description}
         `,
       aspect_ratio: "16:9",
       image_input,
