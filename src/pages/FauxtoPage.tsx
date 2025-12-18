@@ -4,6 +4,7 @@ import type { FauxtoAgent, FauxtoState } from "../../worker/agents/fauxto";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
 import { FooterBadge } from "../partials/FooterBadge";
+import { SharePanel } from "../partials/SharePanel";
 import { getUserIdFromCookie } from "../utils/user-id";
 
 function createAbsoluteUrl(path: string) {
@@ -169,7 +170,7 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
         </div>
 
         <div className="relative mx-auto flex max-w-4xl flex-col gap-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan-300/80">Fauxto</p>
               <h1 className="mt-2 text-3xl font-semibold text-white">
@@ -196,52 +197,22 @@ export function FauxtoPage({ fauxtoId, navigate }: FauxtoPageProps) {
                 </button>
               )}
             </div>
-            <div className="text-right text-sm text-slate-400">
-              <p>Share the magic</p>
-              <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={copyShareLink}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40"
-                >
-                  <span>Copy link</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                    className="h-3.5 w-3.5"
-                  >
-                    <path d="M15 3h6v6" />
-                    <path d="M9 21H3v-6" />
-                    <path d="M21 3l-7 7" />
-                    <path d="M3 21l7-7" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleWebShare}
-                  className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40"
-                >
-                  Share
-                </button>
-                <a
-                  href={smsLink}
-                  className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40"
-                >
-                  Text invite
-                </a>
-                <a
-                  href={twitterShareUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40"
-                >
-                  Post to X
-                </a>
-              </div>
-              <p className="mt-2 text-[11px] text-slate-500">{shareUrl}</p>
+            <div className="w-full max-w-sm">
+              <SharePanel
+                title="Share this Fauxto"
+                description="Send the link or share straight to friends."
+                actions={[
+                  { label: "Copy link", onClick: copyShareLink },
+                  { label: "Share", onClick: handleWebShare },
+                  { label: "Text invite", href: smsLink },
+                  {
+                    label: "Post to X",
+                    href: twitterShareUrl,
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                  },
+                ]}
+              />
             </div>
           </div>
           {showJoinCta && (

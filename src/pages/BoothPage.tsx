@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as QRCode from "qrcode";
 import { useAgent } from "agents/react";
 import type { BoothAgent, BoothState, FauxtoDetail } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
 import { FooterBadge } from "../partials/FooterBadge";
+import { SharePanel } from "../partials/SharePanel";
 
 function createAbsoluteUrl(path: string) {
   const normalized = path.startsWith("/") ? path : `/${path}`;
@@ -70,9 +71,44 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
   const boothPath = `/booths/${encodeURIComponent(slug)}`;
   const phonePath = `${boothPath}/phone`;
   const phoneUrl = createAbsoluteUrl(phonePath);
+  const sharePath = `/share/booths/${encodeURIComponent(slug)}`;
+  const shareUrl = createAbsoluteUrl(sharePath);
+  const shareMessage = `${displayName} is live on Fauxto Booth—add your selfie: ${shareUrl}`;
+  const smsLink = useMemo(() => {
+    if (typeof encodeURIComponent === "undefined") return `sms:?body=${shareMessage}`;
+    return `sms:?body=${encodeURIComponent(shareMessage)}`;
+  }, [shareMessage]);
+  const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareMessage)}`;
   const backgroundUrl = backgroundFilePath
     ? `/api/images/${backgroundFilePath}`
     : null;
+
+  const copyShareLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch (error) {
+      console.warn("Copy failed, falling back to prompt", error);
+      window.prompt?.("Copy this link", shareUrl);
+    }
+  }, [shareUrl]);
+
+  const handleWebShare = useCallback(async () => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: displayName || slug,
+          text: shareMessage,
+          url: shareUrl,
+        });
+        return;
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          console.warn("Share failed", error);
+        }
+      }
+    }
+    await copyShareLink();
+  }, [copyShareLink, displayName, shareMessage, shareUrl, slug]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -300,30 +336,37 @@ export function BoothPage({ slug, navigate }: BoothPageProps) {
                 </div>
               </div>
             </div>
-            <div className="shrink-0 text-center">
-              <div className="rounded-3xl border border-white/15 bg-slate-950/80 p-4 shadow-2xl shadow-black/50">
-                {qrCodeSrc ? (
-                  <img
-                    src={qrCodeSrc}
-                    alt="QR code linking guests to the mobile booth"
-                    className="h-40 w-40 rounded-xl bg-white p-2"
-                  />
-                ) : (
-                  <div className="flex h-40 w-40 items-center justify-center rounded-xl bg-white/70 font-medium text-slate-500">
-                    {qrCodeError ? "QR unavailable" : "Rendering QR…"}
-                  </div>
-                )}
-              </div>
-              {qrCodeError && (
-                <p className="mt-3 text-xs text-rose-200">{qrCodeError}</p>
-              )}
-              <button
-                type="button"
-                onClick={() => navigate(phonePath)}
-                className="mt-4 inline-flex items-center justify-center text-xs font-semibold text-cyan-300 transition hover:text-cyan-200"
-              >
-                📸 Add your selfie
-              </button>
+            <div className="shrink-0 w-full max-w-sm">
+              <SharePanel
+                title="Share booth"
+                description="Invite guests to upload from their phones or scan the QR."
+                qr={{
+                  src: qrCodeSrc,
+                  alt: "QR code linking guests to the mobile booth",
+                  fallbackLabel: "Rendering QR…",
+                  error: qrCodeError,
+                  hint: (
+                    <button
+                      type="button"
+                      onClick={() => navigate(phonePath)}
+                      className="inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-500 to-blue-600 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:from-cyan-300 hover:via-sky-400 hover:to-blue-500"
+                    >
+                      📸 Add your selfie
+                    </button>
+                  ),
+                }}
+                actions={[
+                  { label: "Copy link", onClick: copyShareLink },
+                  { label: "Share", onClick: handleWebShare },
+                  { label: "Text invite", href: smsLink },
+                  {
+                    label: "Post to X",
+                    href: twitterShareUrl,
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                  },
+                ]}
+              />
             </div>
           </div>
 

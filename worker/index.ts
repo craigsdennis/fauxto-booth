@@ -51,6 +51,68 @@ app.get("/api/images/*", async (c) => {
 app.use("*", agentsMiddleware());
 
 
+app.get("/share/booths/:slug", async (c) => {
+  const slug = c.req.param("slug");
+  try {
+    const boothAgent = await getAgentByName(c.env.BoothAgent, slug);
+    const state = await boothAgent.state;
+    const url = new URL(c.req.url);
+    const origin = `${url.protocol}//${url.host}`;
+    const canonical = `${origin}/booths/${encodeURIComponent(slug)}`;
+    const leadFauxto = state.latestFauxtos?.[0];
+    const imageFilePath = leadFauxto?.filePath ?? state.backgroundFilePath ?? null;
+    const imageUrl = imageFilePath ? `${origin}/api/images/${imageFilePath}` : null;
+    const boothTitle = state.displayName || slug;
+    const description =
+      state.description?.trim() ||
+      `Join ${boothTitle} and drop a selfie for an AI-crafted group shot.`;
+    const imageAlt = imageUrl
+      ? `Fauxto Booth preview for ${boothTitle}`
+      : `Fauxto Booth placeholder for ${boothTitle}`;
+    const twitterCard = imageUrl ? "summary_large_image" : "summary";
+    const twitterHandle = c.env.TWITTER_HANDLE ?? "@CloudflareDev";
+    const domain = url.host;
+    const siteName = "Fauxto Booth";
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${boothTitle}</title>
+    <link rel="canonical" href="${canonical}" />
+    <meta name="description" content="${description}" />
+    <meta property="og:title" content="${boothTitle}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${canonical}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="${siteName}" />
+    ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ""}
+    ${imageUrl ? `<meta property="og:image:secure_url" content="${imageUrl}" />` : ""}
+    ${imageUrl ? `<meta property="og:image:width" content="1600" />` : ""}
+    ${imageUrl ? `<meta property="og:image:height" content="900" />` : ""}
+    ${imageUrl ? `<meta property="og:image:alt" content="${imageAlt}" />` : ""}
+    <meta name="twitter:title" content="${boothTitle}" />
+    <meta name="twitter:description" content="${description}" />
+    <meta name="twitter:url" content="${canonical}" />
+    <meta name="twitter:site" content="${twitterHandle}" />
+    <meta name="twitter:creator" content="${twitterHandle}" />
+    <meta name="twitter:domain" content="${domain}" />
+    <meta name="twitter:card" content="${twitterCard}" />
+    ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ""}
+    ${imageUrl ? `<meta name="twitter:image:alt" content="${imageAlt}" />` : ""}
+    <meta http-equiv="refresh" content="2; url=${canonical}" />
+  </head>
+  <body>
+    <p>Redirecting to your booth...</p>
+  </body>
+</html>`;
+    return c.html(html);
+  } catch (error) {
+    console.error("Share view error", error);
+    return c.notFound();
+  }
+});
+
+
 app.get('/share/fauxtos/:id', async (c) => {
   const fauxtoId = c.req.param('id');
   try {
