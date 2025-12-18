@@ -13,7 +13,7 @@ type UploadStatus =
   | { status: "idle" }
   | { status: "pending" }
   | { status: "success" }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; sharePath?: string };
 
 async function canvasToJpegBlob(canvas: HTMLCanvasElement) {
   if (canvas.toBlob) {
@@ -86,6 +86,8 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
       : createAbsoluteUrl(`/booths/${encodeURIComponent(slug)}/phone`);
   const inviteMessage = `Come take a fake photo with me at ${phonePageUrl} and we'll be added to ${displayName}`;
   const smsInviteLink = `sms:?&body=${encodeURIComponent(inviteMessage)}`;
+  const boothSharePath = `/share/booths/${encodeURIComponent(slug)}`;
+  const boothShareUrl = createAbsoluteUrl(boothSharePath);
 
   useEffect(() => {
     const ensured = ensureUserIdCookie();
@@ -179,7 +181,20 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Upload failed. Please try again.");
+        let message = "Upload failed. Please try again.";
+        let sharePath: string | undefined;
+        try {
+          const data = await response.json();
+          if (data?.message) {
+            message = data.message;
+          }
+          if (typeof data?.sharePath === "string") {
+            sharePath = data.sharePath;
+          }
+        } catch {
+          // ignore parsing errors
+        }
+        throw Object.assign(new Error(message), { sharePath });
       }
 
       setUploadStatus({ status: "success" });
@@ -187,10 +202,12 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
         navigate("/me");
       }, 3000);
     } catch (error) {
+      const sharePath = (error as { sharePath?: string }).sharePath;
       setUploadStatus({
         status: "error",
         message:
           error instanceof Error ? error.message : "Something went wrong while uploading your selfie.",
+        sharePath,
       });
     }
   }
@@ -304,7 +321,25 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
               </p>
             )}
             {uploadStatus.status === "error" && (
-              <p className="mt-1 text-rose-300">{uploadStatus.message}</p>
+              <>
+                <p className="mt-1 text-rose-300">{uploadStatus.message}</p>
+                {uploadStatus.sharePath && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <a
+                      href={createAbsoluteUrl(uploadStatus.sharePath)}
+                      className="rounded-2xl border border-white/20 px-3 py-2 text-[11px] font-semibold text-white transition hover:border-white/40"
+                    >
+                      Share this booth instead
+                    </a>
+                    <a
+                      href={`sms:?&body=${encodeURIComponent(`Join me at ${boothShareUrl}`)}`}
+                      className="rounded-2xl border border-white/20 px-3 py-2 text-[11px] font-semibold text-white transition hover:border-white/40"
+                    >
+                      Text the booth link
+                    </a>
+                  </div>
+                )}
+              </>
             )}
           </div>
           <p className="text-center text-xs text-slate-500">

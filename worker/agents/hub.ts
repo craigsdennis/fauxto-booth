@@ -1,5 +1,5 @@
 import { Agent, callable, getAgentByName } from "agents";
-import type { BoothFauxtoRecord } from "./booth";
+import type { BoothFauxtoRecord, BoothUploadRecord } from "./booth";
 
 export type BoothDetail = {
   name: string;
@@ -14,6 +14,12 @@ export type HubFauxtoDetail = {
   boothName: string;
   boothDisplayName: string;
   fauxtos: BoothFauxtoRecord[];
+};
+
+export type HubUploadDetail = {
+  boothName: string;
+  boothDisplayName: string;
+  uploads: BoothUploadRecord[];
 };
 
 export class HubAgent extends Agent<Env, HubState> {
@@ -155,6 +161,48 @@ export class HubAgent extends Agent<Env, HubState> {
     const fauxtoAgent = await getAgentByName(this.env.FauxtoAgent, fauxtoId);
     await fauxtoAgent.delete();
     return true;
+  }
+
+  @callable()
+  async allUploads(): Promise<HubUploadDetail[]> {
+    const slugs = await this.allBoothSlugs();
+    if (slugs.length === 0) {
+      return [];
+    }
+
+    const perBoothUploads = await Promise.all(
+      slugs.map(async (slug) => {
+        try {
+          const booth = await getAgentByName(this.env.BoothAgent, slug);
+          const state = await booth.state;
+          const boothDisplayName = state.displayName || slug;
+          const uploads = await booth.listUploads();
+          return {
+            boothName: slug,
+            boothDisplayName,
+            uploads: uploads ?? [],
+          };
+        } catch (error) {
+          console.warn(`Failed to fetch uploads for booth ${slug}`, error);
+          return {
+            boothName: slug,
+            boothDisplayName: slug,
+            uploads: [],
+          };
+        }
+      })
+    );
+
+    return perBoothUploads;
+  }
+
+  @callable()
+  async deleteUpload({ boothSlug, uploadId }: { boothSlug: string; uploadId: number }) {
+    if (!boothSlug) {
+      throw new Error("A booth slug is required.");
+    }
+    const booth = await getAgentByName(this.env.BoothAgent, boothSlug);
+    return booth.deleteUpload({ uploadId });
   }
 
   @callable()

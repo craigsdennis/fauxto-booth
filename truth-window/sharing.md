@@ -26,3 +26,4 @@ Remember to format it like the others. What I asked for verbatim please
 - Updated the booth host page to use the panel with QR + “Add your selfie” CTA alongside copy/share/text/X actions, removing the raw URL text.
 - Updated the Fauxto page to use the panel (no QR) for consistent sharing controls.
 - Documented the share flows: `/share/booths/:slug` redirects to `/booths/:slug` with OG/Twitter metadata, mirroring the existing `/share/fauxtos/:id` redirect to `/fauxtos/:id`.
+- Added duplicate-upload guardrails on booth uploads; if a user already uploaded, the phone flow now shows the share link so they can invite others instead.

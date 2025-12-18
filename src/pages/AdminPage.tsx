@@ -5,6 +5,7 @@ import type {
   HubAgent,
   HubState,
   HubFauxtoDetail,
+  HubUploadDetail,
 } from "../../worker/agents/hub";
 import { FooterBadge } from "../partials/FooterBadge";
 
@@ -37,6 +38,11 @@ export function AdminPage({ navigate }: AdminPageProps) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pendingBoothDeletes, setPendingBoothDeletes] = useState<Record<string, boolean>>({});
   const [boothDeleteError, setBoothDeleteError] = useState<string | null>(null);
+  const [boothUploads, setBoothUploads] = useState<HubUploadDetail[]>([]);
+  const [uploadLoading, setUploadLoading] = useState(true);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingUploadDeletes, setPendingUploadDeletes] = useState<Record<string, boolean>>({});
+  const [deleteUploadError, setDeleteUploadError] = useState<string | null>(null);
 
   const agent = useAgent<HubAgent, HubState>({
     agent: "hub-agent",
@@ -97,6 +103,37 @@ export function AdminPage({ navigate }: AdminPageProps) {
       .finally(() => {
         if (active) {
           setFauxtoLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [agent, reloadKey]);
+
+  useEffect(() => {
+    if (!agent?.stub?.allUploads) return;
+    let active = true;
+    setUploadLoading(true);
+    setUploadError(null);
+    agent.stub
+      .allUploads()
+      .then((records) => {
+        if (active) {
+          setBoothUploads(records);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setUploadError(
+            err instanceof Error
+              ? err.message
+              : "We couldn't fetch uploads. Please refresh.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setUploadLoading(false);
         }
       });
     return () => {
@@ -175,6 +212,56 @@ export function AdminPage({ navigate }: AdminPageProps) {
     [agent],
   );
 
+  const handleDeleteUpload = useCallback(
+    async (boothSlug: string, uploadId: number) => {
+      if (!agent?.stub?.deleteUpload) {
+        setDeleteUploadError("Delete action is unavailable right now. Try reloading.");
+        return;
+      }
+      const key = `${boothSlug}:${uploadId}`;
+      setDeleteUploadError(null);
+      setPendingUploadDeletes((prev) => ({ ...prev, [key]: true }));
+      try {
+        const result = await agent.stub.deleteUpload({ boothSlug, uploadId });
+        setBoothUploads((groups) =>
+          groups.map((group) => {
+            if (group.boothName !== boothSlug) return group;
+            return {
+              ...group,
+              uploads: group.uploads.filter((upload) => upload.id !== uploadId),
+            };
+          }),
+        );
+        if (result?.deletedFauxtoIds?.length) {
+          setBoothFauxtos((groups) =>
+            groups.map((group) => {
+              if (group.boothName !== boothSlug) return group;
+              return {
+                ...group,
+                fauxtos: group.fauxtos.filter(
+                  (record) => !result.deletedFauxtoIds.includes(record.fauxtoId),
+                ),
+              };
+            }),
+          );
+        }
+      } catch (err) {
+        setDeleteUploadError(
+          err instanceof Error
+            ? err.message
+            : "We couldn't delete that upload. Try again.",
+        );
+      } finally {
+        setPendingUploadDeletes((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }
+    },
+    [agent],
+  );
+
   const sortedSlugs = useMemo(() => {
     return [...boothSlugs].sort();
   }, [boothSlugs]);
@@ -193,12 +280,26 @@ export function AdminPage({ navigate }: AdminPageProps) {
 
   const hasSlugs = sortedSlugs.length > 0;
   const hasBoothFauxtos = orderedBoothFauxtos.length > 0;
+  const orderedBoothUploads = useMemo(() => {
+    if (sortedSlugs.length === 0) {
+      return [...boothUploads];
+    }
+    const order = new Map(sortedSlugs.map((slug, index) => [slug, index]));
+    return [...boothUploads].sort((a, b) => {
+      const aIndex = order.get(a.boothName) ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = order.get(b.boothName) ?? Number.MAX_SAFE_INTEGER;
+      return aIndex - bIndex;
+    });
+  }, [boothUploads, sortedSlugs]);
+  const hasBoothUploads = orderedBoothUploads.length > 0;
 
   const reloadDisabled =
     loading ||
     fauxtoLoading ||
+    uploadLoading ||
     !agent?.stub?.allBoothSlugs ||
-    !agent?.stub?.allFauxtos;
+    !agent?.stub?.allFauxtos ||
+    !agent?.stub?.allUploads;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
@@ -277,6 +378,107 @@ export function AdminPage({ navigate }: AdminPageProps) {
                   </ul>
                 ) : (
                   <p className="mt-6 text-sm text-slate-400">No booths found yet. Spin one up from the lobby.</p>
+                )}
+              </>
+            )}
+          </div>
+          <div className="mt-8 rounded-[32px] border border-white/10 bg-slate-900/70 p-8 shadow-2xl shadow-black/40">
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan-300/80">
+              Uploads
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">
+              All guest uploads
+            </h2>
+            <p className="mt-3 text-sm text-slate-400">
+              Inspect every uploaded selfie per booth. Removing an upload will also delete any Fauxtos that selfie was used in.
+            </p>
+            {deleteUploadError && (
+              <p className="mt-4 text-sm text-rose-300">{deleteUploadError}</p>
+            )}
+            {uploadLoading && (
+              <p className="mt-6 text-sm text-slate-400">Loading uploads…</p>
+            )}
+            {uploadError && (
+              <p className="mt-6 text-sm text-rose-300">{uploadError}</p>
+            )}
+            {!uploadLoading && !uploadError && (
+              <>
+                {hasBoothUploads ? (
+                  <div className="mt-6 space-y-6">
+                    {orderedBoothUploads.map((group) => {
+                      const hasGroupUploads = group.uploads.length > 0;
+                      return (
+                        <div
+                          key={group.boothName}
+                          className="rounded-3xl border border-white/10 bg-slate-950/40 p-5"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-white">
+                                {group.boothDisplayName}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {group.boothName}
+                              </p>
+                            </div>
+                            <p className="text-xs uppercase tracking-[0.3em] text-cyan-200">
+                              {group.uploads.length} Upload{group.uploads.length === 1 ? "" : "s"}
+                            </p>
+                          </div>
+                          {hasGroupUploads ? (
+                            <ul className="mt-4 space-y-3">
+                              {group.uploads.map((upload) => {
+                                const key = `${group.boothName}:${upload.id}`;
+                                const isDeleting = Boolean(pendingUploadDeletes[key]);
+                                return (
+                                  <li
+                                    key={upload.id}
+                                    className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-slate-900/60 p-4"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <img
+                                        src={`/api/images/${upload.filePath}`}
+                                        alt={`Upload ${upload.id}`}
+                                        className="h-20 w-20 rounded-2xl object-cover"
+                                      />
+                                      <div className="flex flex-col">
+                                        <p className="text-xs text-white">
+                                          User {upload.postedByUserId}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                          {formatTimestamp(upload.createdAt)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="ml-auto flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em]">
+                                      <button
+                                        type="button"
+                                        className="rounded-2xl border border-rose-400/40 px-3 py-1 text-rose-300 transition hover:border-rose-300 disabled:opacity-50"
+                                        disabled={isDeleting}
+                                        onClick={() =>
+                                          handleDeleteUpload(group.boothName, upload.id)
+                                        }
+                                      >
+                                        {isDeleting ? "Deleting…" : "Delete"}
+                                      </button>
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : (
+                            <p className="mt-4 text-sm text-slate-500">
+                              No uploads captured yet for this booth.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-6 text-sm text-slate-400">
+                    No booths available yet.
+                  </p>
                 )}
               </>
             )}

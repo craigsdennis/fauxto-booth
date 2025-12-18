@@ -21,6 +21,13 @@ export type BoothFauxtoRecord = {
   createdAt: string;
 };
 
+export type BoothUploadRecord = {
+  id: number;
+  filePath: string;
+  postedByUserId: string;
+  createdAt: string;
+};
+
 export type BoothState = {
   displayName: string;
   description: string;
@@ -321,7 +328,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
     const [backgroundMarker, ...peopleMarkers] = image_input.map((_, index) => `image_${index}`);
     const input = {
       size: "4K",
-      prompt: `Using the backdrop of ${backgroundMarker} and then add ${peopleMarkers.join(" and ")} to the photo. 
+      prompt: `Using the backdrop of ${backgroundMarker} and then add the following people ${peopleMarkers.join(" and ")} only to the photo. 
         Make their outfits and expressions match what might happen in a photobooth that has been described as: ${this.state.description}
         `,
       aspect_ratio: "16:9",
@@ -412,6 +419,22 @@ LIMIT ${limit};
   }
 
   @callable()
+  async listUploads(): Promise<BoothUploadRecord[]> {
+    const rows = this.sql<{
+      id: number;
+      filePath: string;
+      postedByUserId: string;
+      createdAt: string;
+    }>`SELECT id, filePath, postedByUserId, createdAt FROM uploads ORDER BY createdAt DESC;`;
+    return rows.map((row) => ({
+      id: row.id,
+      filePath: row.filePath,
+      postedByUserId: row.postedByUserId,
+      createdAt: row.createdAt,
+    }));
+  }
+
+  @callable()
   async listAllFauxtos(): Promise<BoothFauxtoRecord[]> {
     const rows = this.sql<{
       id: string;
@@ -438,6 +461,21 @@ LIMIT ${limit};
     const userId = form.get("userId") as string;
     if (!(file instanceof File)) {
       return new Response("No file field named 'file'", { status: 400 });
+    }
+    const existing =
+      this.sql<{ total: number }>`SELECT COUNT(*) as total FROM uploads WHERE postedByUserId = ${userId};`;
+    const total = existing[0]?.total ?? 0;
+    if (total > 0) {
+      const sharePath = `/share/booths/${encodeURIComponent(this.name)}`;
+      return Response.json(
+        {
+          success: false,
+          reason: "duplicate-upload",
+          message: "You already uploaded to this booth. Share the booth link to invite friends.",
+          sharePath,
+        },
+        { status: 409 },
+      );
     }
     const uploadFileName = `${this.name}/uploads/${userId}/${file.name}`;
     await this.env.Photos.put(uploadFileName, file.stream(), {
@@ -521,6 +559,49 @@ LIMIT ${limit};
       this.sql<{ total: number }>`SELECT COUNT(*) as total FROM uploads WHERE postedByUserId = ${userId};`;
     const total = rows[0]?.total ?? 0;
     return total > 0;
+  }
+
+  @callable()
+  async deleteUpload({ uploadId }: { uploadId: number }): Promise<{ deletedFauxtoIds: string[] }> {
+    const rows =
+      this.sql<{ id: number; filePath: string }>`SELECT id, filePath FROM uploads WHERE id = ${uploadId} LIMIT 1;`;
+    const upload = rows[0];
+    if (!upload) {
+      throw new Error("Upload not found.");
+    }
+
+    const fauxtoRows =
+      this.sql<{ fauxtoId: string }>`SELECT DISTINCT fauxtoId FROM fauxto_members WHERE uploadId = ${uploadId};`;
+    const deletedFauxtoIds: string[] = [];
+    for (const { fauxtoId } of fauxtoRows) {
+      try {
+        const fauxtoAgent = await getAgentByName(this.env.FauxtoAgent, fauxtoId);
+        await fauxtoAgent.delete();
+        deletedFauxtoIds.push(fauxtoId);
+      } catch (error) {
+        console.warn(`Failed to delete fauxto ${fauxtoId} while removing upload ${uploadId}`, error);
+      }
+    }
+
+    this.sql`DELETE FROM fauxto_members WHERE uploadId = ${uploadId};`;
+    this.sql`DELETE FROM uploads WHERE id = ${uploadId};`;
+
+    if (upload.filePath) {
+      try {
+        await this.env.Photos.delete(upload.filePath);
+      } catch (error) {
+        console.warn(`Failed to delete upload file ${upload.filePath}`, error);
+      }
+    }
+
+    const [{ total }] =
+      this.sql<{ total: number }>`SELECT COUNT(*) as total FROM uploads;`;
+    this.setState({
+      ...this.state,
+      uploadedCount: total,
+    });
+
+    return { deletedFauxtoIds };
   }
 
   @callable()
