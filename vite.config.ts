@@ -11,6 +11,6 @@ export default defineConfig({
     target: "es2022",
   },
   server: {
-    allowedHosts: ["cassette-lovely-baths-jewel.trycloudflare.com"]
+    allowedHosts: ["anatomy-seek-cow-tuition.trycloudflare.com"]
   }
 });

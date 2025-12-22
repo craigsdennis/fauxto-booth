@@ -48,16 +48,11 @@
         "HubAgent",
         "BoothAgent",
         "FauxtoAgent",
-      ],
-    },
-	{
-      "tag": "v2",
-      "new_sqlite_classes": [
         "UserAgent",
       ],
     },
   ],
-  "images": {"binding": "Images"},
+  "images": { "binding": "Images" },
   "workflows": [
     {
       "binding": "Backgrounder",

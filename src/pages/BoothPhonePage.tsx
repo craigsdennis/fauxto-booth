@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAgent } from "agents/react";
+import { agentFetch } from "agents/client";
 import type { BoothAgent, BoothState } from "../../worker/agents/booth";
 import type { Navigate } from "../navigation";
 import { ensureUserIdCookie } from "../utils/user-id";
@@ -79,7 +80,6 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
     },
   });
 
-  const uploadEndpoint = `/agents/booth-agent/${encodeURIComponent(slug)}`;
   const phonePageUrl =
     typeof window !== "undefined"
       ? window.location.href
@@ -174,7 +174,11 @@ export function BoothPhonePage({ slug, navigate }: BoothPhonePageProps) {
 
     try {
       setUploadStatus({ status: "pending" });
-      const response = await fetch(uploadEndpoint, {
+      const response = await agentFetch({
+        host: window.location.host,
+        agent: "booth-agent",
+        name: slug
+      }, {
         method: "POST",
         body: formData,
         credentials: "include",

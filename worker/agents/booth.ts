@@ -480,7 +480,7 @@ LIMIT ${limit};
     }
     const uploadFileName = `${this.name}/uploads/${userId}/${file.name}`;
     const transformed = await this.env.Images.input(file.stream())
-      .transform({gravity: "face", zoom: "0.9"})
+      .transform({gravity: "face", zoom: 0.9})
       .output({
         format: "image/jpeg",
       });
