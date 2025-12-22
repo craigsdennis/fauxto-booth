@@ -11,6 +11,6 @@ export default defineConfig({
     target: "es2022",
   },
   server: {
-    allowedHosts: ["joel-looked-political-city.trycloudflare.com"]
+    allowedHosts: ["cassette-lovely-baths-jewel.trycloudflare.com"]
   }
 });

@@ -57,6 +57,7 @@
       ],
     },
   ],
+  "images": {"binding": "Images"},
   "workflows": [
     {
       "binding": "Backgrounder",

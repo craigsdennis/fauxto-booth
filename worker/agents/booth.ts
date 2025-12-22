@@ -145,7 +145,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
     });
     const input = {
       size: "4K",
-      prompt: `A photo shoot setup or stage that is set to look like. There should be no people in it currently: ${this.state.description}`,
+      prompt: `The background of a photo that is about ready to have people pose. There should be no people in it currently. Make it look like: ${this.state.description}`,
       aspect_ratio: "16:9",
     };
     const output = await replicate.run("bytedance/seedream-4.5", { input });
@@ -196,7 +196,6 @@ export class BoothAgent extends Agent<Env, BoothState> {
         return;
       }
       if (!reshoot) {
-
         if (since < 30000) {
           console.warn(
             `Only ${awaiting} awaiting, want ${this.state.idealMemberSize}.`
@@ -325,11 +324,11 @@ export class BoothAgent extends Agent<Env, BoothState> {
       ...urls,
     ];
     console.log({ image_input });
-    const [backgroundMarker, ...peopleMarkers] = image_input.map((_, index) => `image_${index}`);
+    // const [backgroundMarker, ...peopleMarkers] = image_input.map((_, index) => `image_${index}`);
     const input = {
-      size: "4K",
-      prompt: `Using the backdrop of ${backgroundMarker} and then add the following people ${peopleMarkers.join(" and ")} only to the photo. 
-        Make their outfits and expressions match what might happen in a photobooth that has been described as: ${this.state.description}
+      size: "2K",
+      prompt: `Using the first photo as the backdrop and then add the people from the remaining images to the main photograph. 
+        Make their outfits and expressions match what might happen in a photo booth that has been described to be: ${this.state.description}
         `,
       aspect_ratio: "16:9",
       image_input,
@@ -462,8 +461,9 @@ LIMIT ${limit};
     if (!(file instanceof File)) {
       return new Response("No file field named 'file'", { status: 400 });
     }
-    const existing =
-      this.sql<{ total: number }>`SELECT COUNT(*) as total FROM uploads WHERE postedByUserId = ${userId};`;
+    const existing = this.sql<{
+      total: number;
+    }>`SELECT COUNT(*) as total FROM uploads WHERE postedByUserId = ${userId};`;
     const total = existing[0]?.total ?? 0;
     if (total > 0) {
       const sharePath = `/share/booths/${encodeURIComponent(this.name)}`;
@@ -471,15 +471,25 @@ LIMIT ${limit};
         {
           success: false,
           reason: "duplicate-upload",
-          message: "You already uploaded to this booth. Share the booth link to invite friends.",
+          message:
+            "You already uploaded to this booth. Share the booth link to invite friends.",
           sharePath,
         },
-        { status: 409 },
+        { status: 409 }
       );
     }
     const uploadFileName = `${this.name}/uploads/${userId}/${file.name}`;
-    await this.env.Photos.put(uploadFileName, file.stream(), {
-      httpMetadata: { contentType: file.type },
+    const transformed = await this.env.Images.input(file.stream())
+      .transform({gravity: "face", zoom: "0.9"})
+      .output({
+        format: "image/jpeg",
+      });
+    const response = transformed.response();
+
+    const transformedBuffer = await response.arrayBuffer();
+
+    await this.env.Photos.put(uploadFileName, transformedBuffer, {
+      httpMetadata: { contentType: transformed.contentType() },
     });
     this
       .sql`INSERT INTO uploads (postedByUserId, filePath) VALUES (${userId}, ${uploadFileName});`;
@@ -528,8 +538,9 @@ LIMIT ${limit};
     const latestFauxtos = this.state.latestFauxtos.filter(
       (fauxto) => fauxto.fauxtoId !== fauxtoId
     );
-    const [{ total }] =
-      this.sql<{ total: number }>`SELECT COUNT(*) as total FROM fauxtos;`;
+    const [{ total }] = this.sql<{
+      total: number;
+    }>`SELECT COUNT(*) as total FROM fauxtos;`;
     this.setState({
       ...this.state,
       latestFauxtos,
@@ -555,31 +566,45 @@ LIMIT ${limit};
     if (!userId) {
       return false;
     }
-    const rows =
-      this.sql<{ total: number }>`SELECT COUNT(*) as total FROM uploads WHERE postedByUserId = ${userId};`;
+    const rows = this.sql<{
+      total: number;
+    }>`SELECT COUNT(*) as total FROM uploads WHERE postedByUserId = ${userId};`;
     const total = rows[0]?.total ?? 0;
     return total > 0;
   }
 
   @callable()
-  async deleteUpload({ uploadId }: { uploadId: number }): Promise<{ deletedFauxtoIds: string[] }> {
-    const rows =
-      this.sql<{ id: number; filePath: string }>`SELECT id, filePath FROM uploads WHERE id = ${uploadId} LIMIT 1;`;
+  async deleteUpload({
+    uploadId,
+  }: {
+    uploadId: number;
+  }): Promise<{ deletedFauxtoIds: string[] }> {
+    const rows = this.sql<{
+      id: number;
+      filePath: string;
+    }>`SELECT id, filePath FROM uploads WHERE id = ${uploadId} LIMIT 1;`;
     const upload = rows[0];
     if (!upload) {
       throw new Error("Upload not found.");
     }
 
-    const fauxtoRows =
-      this.sql<{ fauxtoId: string }>`SELECT DISTINCT fauxtoId FROM fauxto_members WHERE uploadId = ${uploadId};`;
+    const fauxtoRows = this.sql<{
+      fauxtoId: string;
+    }>`SELECT DISTINCT fauxtoId FROM fauxto_members WHERE uploadId = ${uploadId};`;
     const deletedFauxtoIds: string[] = [];
     for (const { fauxtoId } of fauxtoRows) {
       try {
-        const fauxtoAgent = await getAgentByName(this.env.FauxtoAgent, fauxtoId);
+        const fauxtoAgent = await getAgentByName(
+          this.env.FauxtoAgent,
+          fauxtoId
+        );
         await fauxtoAgent.delete();
         deletedFauxtoIds.push(fauxtoId);
       } catch (error) {
-        console.warn(`Failed to delete fauxto ${fauxtoId} while removing upload ${uploadId}`, error);
+        console.warn(
+          `Failed to delete fauxto ${fauxtoId} while removing upload ${uploadId}`,
+          error
+        );
       }
     }
 
@@ -594,8 +619,9 @@ LIMIT ${limit};
       }
     }
 
-    const [{ total }] =
-      this.sql<{ total: number }>`SELECT COUNT(*) as total FROM uploads;`;
+    const [{ total }] = this.sql<{
+      total: number;
+    }>`SELECT COUNT(*) as total FROM uploads;`;
     this.setState({
       ...this.state,
       uploadedCount: total,
@@ -619,7 +645,9 @@ LIMIT ${limit};
       }
     }
 
-    const uploadRows = this.sql<{ filePath: string }>`SELECT filePath FROM uploads;`;
+    const uploadRows = this.sql<{
+      filePath: string;
+    }>`SELECT filePath FROM uploads;`;
     await Promise.all(
       uploadRows.map(async ({ filePath }) => {
         try {
