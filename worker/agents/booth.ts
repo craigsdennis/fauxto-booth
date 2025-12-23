@@ -178,17 +178,10 @@ export class BoothAgent extends Agent<Env, BoothState> {
 
   async snapFauxto({ reshoot = false }: { reshoot: boolean }) {
     const awaiting = this.awaitingUploaderCount();
-    if (awaiting <= 0 && !reshoot) {
-      console.warn(
-        "All uploaders already captured, set reshoot to true to snap"
-      );
-      return;
-    }
     // If we don't yet have the ideal amount of folks
     if (awaiting < this.state.idealMemberSize) {
-      // ... and less than 30 seconds have passed since the last snap.
       const since = this.msSinceLastFauxto();
-      // First time
+      // First fauxto in this booth, we should make them wait, no matter what
       if (since === -1) {
         this.updateDisplayStatus({
           displayStatus: `Invite more people to upload their photo, missing ${this.state.idealMemberSize - awaiting}`,
@@ -196,21 +189,19 @@ export class BoothAgent extends Agent<Env, BoothState> {
         return;
       }
       if (!reshoot) {
-        if (since < 30000) {
-          console.warn(
-            `Only ${awaiting} awaiting, want ${this.state.idealMemberSize}.`
-          );
-          this.updateDisplayStatus({ displayStatus: "Waiting for a few more" });
-          // ...schedule a call in 10 seconds to try again
-          const scheduled = this.getSchedules().some(
-            (s) => s.callback === "snapFauxto"
-          );
-          if (!scheduled) {
-            console.log("Scheduling a retry in 10 seconds");
-            await this.schedule(10, "snapFauxto", { reshoot: false });
-          }
-          return;
+        console.warn(
+          `Only ${awaiting} awaiting, want ${this.state.idealMemberSize}.`
+        );
+        this.updateDisplayStatus({ displayStatus: `Waiting for ${awaiting} more. Share it with friends` });
+        // ...schedule a call in 5 minutes to try again
+        const scheduled = this.getSchedules().some(
+          (s) => s.callback === "snapFauxto"
+        );
+        if (!scheduled) {
+          console.log("Scheduling a reshoot in 5 minutes");
+          await this.schedule(300, "snapFauxto", { reshoot: true });
         }
+        return;
       }
     }
     this.updateDisplayStatus({ displayStatus: `📸 Snapping fauxtos` });
