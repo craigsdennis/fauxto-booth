@@ -1,5 +1,7 @@
 # Fauxto Booth
 
+[<img src="https://img.youtube.com/vi/JvoGnXEKzfc/0.jpg">](https://youtu.be/JvoGnXEKzfc "Build an AI Agent Fake Photo Booth for your Real Friends")
+
 Fauxto Booth is a Cloudflare-native photo kiosk that lets guests snap a selfie, drop it into a booth-specific flow, and watch an AI composite appear moments later. The lobby, booth controls, guest upload flow, and Fauxto detail pages are all rendered with a Vite + React frontend, while booth automation runs inside Cloudflare Workers powered by the Agents SDK and Workflows.
 
 ## Architecture at a glance
