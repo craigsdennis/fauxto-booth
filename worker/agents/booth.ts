@@ -110,7 +110,7 @@ export class BoothAgent extends Agent<Env, BoothState> {
       usersWithFauxto: number;
     }>`SELECT
       COUNT(DISTINCT u.postedByUserId) AS totalUploaders,
-      COUNT(DISTINCT fm.memberUserId)AS usersWithFauxto
+      COUNT(DISTINCT fm.memberUserId) AS usersWithFauxto
     FROM uploads u
     LEFT JOIN fauxto_members fm
     ON fm.memberUserId = u.postedByUserId;`;
@@ -192,14 +192,14 @@ export class BoothAgent extends Agent<Env, BoothState> {
         console.warn(
           `Only ${awaiting} awaiting, want ${this.state.idealMemberSize}.`
         );
-        this.updateDisplayStatus({ displayStatus: `Waiting for ${awaiting} more. Share it with friends` });
-        // ...schedule a call in 5 minutes to try again
+        this.updateDisplayStatus({ displayStatus: `Waiting for ${this.state.idealMemberSize - awaiting} more. Share it with friends` });
+        // ...schedule a call in 2 minutes to try again
         const scheduled = this.getSchedules().some(
           (s) => s.callback === "snapFauxto"
         );
         if (!scheduled) {
-          console.log("Scheduling a reshoot in 5 minutes");
-          await this.schedule(300, "snapFauxto", { reshoot: true });
+          console.log("Scheduling a reshoot in 2 minutes");
+          await this.schedule(120, "snapFauxto", { reshoot: true });
         }
         return;
       }
